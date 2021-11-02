@@ -1,0 +1,171 @@
+{% args d %}
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>NPBC-ESP32-Monitor</title>
+    <!-- Bootstrap core CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet">
+    <script type="text/javascript">
+         
+        $("#submitTemp").click(function(event){
+            console.log( $('#boilerTemperature').val());
+            var data =
+                {
+                    boilerTemperature: $('#boilerTemperature').val()
+                };
+
+                var dataToSend = JSON.stringify(data);
+            $.ajax(
+                        {
+                            url: '/api/setBoilerTemperature',
+                            type: 'POST',
+                            data: dataToSend,
+
+                            success: function (jsonResponse) {
+                                var objresponse = JSON.parse(jsonResponse);
+                                console.log(objresponse['boilerTemperature']);
+
+                                $("#boilerTemperature").text(objresponse['boilerTemperature']);
+
+                            },
+                            error: function () {
+                                $("#boilerTemperature").text("Error to load api");
+
+                            }
+                        });
+                        
+           
+  });
+  $("#submitMode").click(function(event){
+            console.log( $('#Mode').val());
+            console.log( $('#Priority').val());
+            var data =
+                {
+                    Mode: $('#Mode').val(),
+                    Priority: $('#Priority').val()
+                };
+
+                var dataToSend = JSON.stringify(data);
+            $.ajax(
+                        {
+                            url: '/api/setModeAndPriority',
+                            type: 'POST',
+                            data: dataToSend,
+
+                            success: function (jsonResponse) {
+                                var objresponse = JSON.parse(jsonResponse);
+                              
+                            },
+                            error: function () {
+                                
+                            }
+                        });
+                        
+           
+  });
+
+    </script>
+</head>
+<body>
+    <!-- Nav tabs -->
+    <ul class="nav nav-tabs" role="tablist">
+        <li class="active"><a href="#home" role="tab" data-toggle="tab">Home</a></li>
+        <li><a href="#settings" role="tab" data-toggle="tab">Settings</a></li>
+    </ul>
+
+    <!-- Tab panes -->
+    <div class="tab-content">
+        <div class="tab-pane active" id="home">
+            <div class="container-fluid" style="padding-top:10px">
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div class="panel panel-default">
+                            <div class="panel-heading">Current state</div>
+                            <div class="panel-body">
+                                <div class="row">
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">Mode: {{ d["Mode"] }} </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">State: {{ d["State"] }} </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">Power: {{ d["Status"] }} {{ d["Power"] }} </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">Flame: {{ d["Flame"] }} </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">Fan %: {{ d["Fan"] }} </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">Tset: {{ d["Tset"] }} °C </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">TBoiler: {{ d["Tboiler"] }} °C </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">TDHW: {{ d["DHW"] }} °C </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">CHPump: {{ d["CHPump"] }} </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">DHWPump: {{ d["DHWPump"] }} </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">Toutside: {{ d["TBMP"] }} °C </button>
+                                    </div>
+                                    <div class="col">
+                                        <button type="button" class="btn btn-default btn-md btn-block" style="text-align:left; padding-left:20px">Presuare: {{ d["PBMP"] }} hPa </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tab-pane" id="settings">
+            <div class="container-fluid" style="padding-top:10px">
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div class="panel panel-default">
+                                <div class="panel-heading">Burner Options</div>
+                                <div class="panel-body">
+                                    <div class="row">
+                                        <div class="col">
+                                            <label>Mode </label>
+                                            <select name="Mode" id="Mode">
+                                                <option value="0">StandBy</option>
+                                                <option value="1">Auto</option>
+                                                <option value="2">Timer</option>
+                                            </select>
+                                            <select name="Priority" id="Priority">
+                                                <option value="0">CHPriority</option>
+                                                <option value="1">DHWPriority</option>
+                                                <option value="2">Paralel Pumps</option>
+                                                <option value="3">Summer Mode</option>
+                                            </select>
+                                            <button id="submitMode">Set</button>
+                                            <br>
+                                            <label>Temperature: </Label>
+                                            <input type="number" id="boilerTemperature" />
+                                            <button id="submitTemp">Set</button>
+                                        </div>
+                                    </div>
+                                </div>
+                        </div>
+                    </div>
+                </div> 
+            </div>
+        </div>
+    </div>
+
+    <script src="https://momentjs.com/downloads/moment.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+</body>
+</html>
