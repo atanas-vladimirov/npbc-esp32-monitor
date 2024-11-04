@@ -4,6 +4,7 @@ from machine import SoftI2C, Pin, Timer
 import network
 import micropython
 import urequests as requests
+import json
 
 import picoweb
 import onewire
@@ -86,10 +87,15 @@ def collect_data(timer):
     except Exception as e:
         err = e
 
+# <web repl login>
+# import sys
+# sys.print_exception(err)
 
 timer1 = Timer(1)
 timer1.init(period=30000, mode=Timer.PERIODIC, callback=collect_data)
 
+# to stop the timer
+# timer1.deinit()
 
 def mode(x):
     return {
@@ -131,6 +137,7 @@ def status(x):
         '8': 'Unfolding',
         '9': 'Burning',
         '10': 'Extinction',
+        '11': 'Standby/Extinct',
     }[x]
 
 
@@ -158,5 +165,30 @@ def index(req, resp):
 
     yield from picoweb.start_response(resp)
     yield from app.render_template(resp, "index.html", (data,))
+
+@app.route("/setModeAndPriority")
+def setModeAndPriority(req, resp):
+    method = req.method
+    print("Method was:" + method)
+
+    if req.method == "POST":
+        yield from req.read_form_data()
+        
+#        print('req.__dict__')
+#        print(req.__dict__)
+#        print("")
+        
+        data = req.form
+        import setModeAndPriority
+        sp = setModeAndPriority.SerialProcessSet(int(data["Mode"]),int(data["Priority"]))
+        sp.run()
+
+    else:
+        req.parse_qs()
+
+    yield from picoweb.start_response(resp)
+    yield from resp.awrite("OK")
+    yield from resp.awrite("\r\n")
+
 
 app.run(debug=True, host = ip, port = 80)

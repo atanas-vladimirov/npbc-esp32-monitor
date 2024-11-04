@@ -144,6 +144,29 @@ class setBoilerTemperatureCommand(commandBase):
       return failResponse()
 
 
+class setModeAndPriorityCommand(commandBase):
+  def __init__(self, mode, priority):
+    super(setModeAndPriorityCommand, self).__init__(0x03)
+    self.__mode = mode
+    self.__priority = priority
+
+  def getRequestData(self):
+    request=bytearray(([self.__mode]))
+    request.append(self.__priority)
+    return super(setModeAndPriorityCommand, self).getRequestData(request)
+
+  def processResponseData(self, response):
+    try:
+      responseData = super(setModeAndPriorityCommand, self).processResponseData(response)
+    except:
+      self.IsSuccessful = False
+
+    if (self.IsSuccessful == True and len(responseData) == 1 and responseData[0] == 0x34):
+      return successResponse(responseData)
+    else:
+      return failResponse()
+
+
 class resetFFWorkTimeCounterCommand(commandBase):
   def __init__(self):
     super(resetFFWorkTimeCounterCommand, self).__init__(0x09)

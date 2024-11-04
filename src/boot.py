@@ -33,7 +33,8 @@ def do_connect():
     if not sta_if.isconnected():
         print('connecting to network...')
         sta_if.active(True)
-        sta_if.connect('whitebox', 'nexus@home')
+        sta_if.config(pm=sta_if.PM_NONE) # disable power management
+        sta_if.connect('name', 'password')
         while not sta_if.isconnected():
             pass
     print('network config:', sta_if.ifconfig())
@@ -42,3 +43,7 @@ do_connect()
 # synchronize with ntp
 ntptime.host = 'bg.pool.ntp.org'
 ntptime.settime()  # set the rtc datetime from the remote server
+
+# start FTP server
+# https://github.com/robert-hh/FTP-Server-for-ESP8266-ESP32-and-PYBD
+import uftpd

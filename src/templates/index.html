@@ -6,65 +6,37 @@
     <title>NPBC-ESP32-Monitor</title>
     <!-- Bootstrap core CSS -->
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://momentjs.com/downloads/moment.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
     <script type="text/javascript">
-         
-        $("#submitTemp").click(function(event){
-            console.log( $('#boilerTemperature').val());
-            var data =
-                {
-                    boilerTemperature: $('#boilerTemperature').val()
-                };
+        window.onload = function () {
+            $("#submitMode").click(function(event){
+                console.log( $('#Mode').val());
+                console.log( $('#Priority').val());
+                var data =
+                    {
+                        Mode: $('#Mode').val(),
+                        Priority: $('#Priority').val()
+                    };
 
-                var dataToSend = JSON.stringify(data);
-            $.ajax(
+                $.ajax(
                         {
-                            url: '/api/setBoilerTemperature',
+                            url: '/setModeAndPriority',
                             type: 'POST',
-                            data: dataToSend,
-
-                            success: function (jsonResponse) {
-                                var objresponse = JSON.parse(jsonResponse);
-                                console.log(objresponse['boilerTemperature']);
-
-                                $("#boilerTemperature").text(objresponse['boilerTemperature']);
-
-                            },
-                            error: function () {
-                                $("#boilerTemperature").text("Error to load api");
-
-                            }
-                        });
-                        
-           
-  });
-  $("#submitMode").click(function(event){
-            console.log( $('#Mode').val());
-            console.log( $('#Priority').val());
-            var data =
-                {
-                    Mode: $('#Mode').val(),
-                    Priority: $('#Priority').val()
-                };
-
-                var dataToSend = JSON.stringify(data);
-            $.ajax(
-                        {
-                            url: '/api/setModeAndPriority',
-                            type: 'POST',
-                            data: dataToSend,
+                            data: data,
 
                             success: function (jsonResponse) {
                                 var objresponse = JSON.parse(jsonResponse);
                               
                             },
                             error: function () {
-                                
+                                $("#Mode").text("Error to load api");
                             }
                         });
-                        
-           
-  });
-
+            });
+        }
     </script>
 </head>
 <body>
@@ -149,10 +121,6 @@
                                                 <option value="3">Summer Mode</option>
                                             </select>
                                             <button id="submitMode">Set</button>
-                                            <br>
-                                            <label>Temperature: </Label>
-                                            <input type="number" id="boilerTemperature" />
-                                            <button id="submitTemp">Set</button>
                                         </div>
                                     </div>
                                 </div>
@@ -163,9 +131,5 @@
         </div>
     </div>
 
-    <script src="https://momentjs.com/downloads/moment.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
-    <script src="https://code.highcharts.com/highcharts.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
 </body>
 </html>
