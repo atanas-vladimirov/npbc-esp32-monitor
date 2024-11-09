@@ -7,6 +7,7 @@ import uos
 import machine
 import ntptime
 import network
+import mip
 import webrepl
 
 gc.collect()

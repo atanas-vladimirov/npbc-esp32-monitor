@@ -4,7 +4,6 @@ from machine import SoftI2C, Pin, Timer
 import network
 import micropython
 import urequests as requests
-import json
 
 import picoweb
 import onewire
