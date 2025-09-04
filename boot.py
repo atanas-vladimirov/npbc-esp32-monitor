@@ -36,7 +36,7 @@ def connect_wifi():
     if not sta_if.isconnected():
         print('Connecting to network...')
         sta_if.active(True)
-        sta_if.config(pm=0xA11140)
+        sta_if.config(pm=sta_if.PM_NONE) # disable power management
         
         if config.STATIC_IP:
             sta_if.ifconfig(config.STATIC_IP)
