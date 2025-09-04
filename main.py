@@ -1,0 +1,169 @@
+# main.py
+import gc
+import json
+import uasyncio as asyncio
+import urequests as requests
+from machine import Pin, SPI
+import network
+import time
+
+# Web framework
+from microdot_asyncio import Microdot, Response, send_file
+
+# App-specific imports
+import config
+from lib.npbc import NPBCController
+from lib.ota import OTAUpdater
+from drivers.max6675 import MAX6675
+from drivers.bme280_driver import BME280
+import onewire
+import ds18x20
+
+# --- State Management ---
+app_state = {
+    'burner': {'status': 'Initializing...'},
+    'sensors': {'status': 'Initializing...'},
+    'last_update': 'Never'
+}
+
+# --- OTA Updater Instance ---
+ota_updater = OTAUpdater(config.GITHUB_REPO, main_dir='.')
+
+# --- Sensor Reading Classes ---
+class SensorReader:
+    def __init__(self):
+        spi = SPI(1, baudrate=2000000, 
+                  sck=Pin(config.PIN_SPI_SCK), 
+                  mosi=Pin(config.PIN_SPI_MOSI), 
+                  miso=Pin(config.PIN_SPI_MISO))
+        cs = Pin(config.PIN_BME_CS)
+        self.bme = BME280(spi=spi, cs=cs)
+        print(f"Detected Chip ID: {hex(self.bme.chip_id)}. Is BME280: {self.bme.is_bme280}")
+
+        ds_pin = Pin(config.PIN_DS18X20)
+        self.ds_sensor = ds18x20.DS18X20(onewire.OneWire(ds_pin))
+        roms = self.ds_sensor.scan()
+        self.ds_rom = roms[0] if roms else None
+
+        self.k_type = MAX6675(config.PIN_MAX6675_SCK, config.PIN_MAX6675_CS, config.PIN_MAX6675_SO)
+
+    async def read_all(self):
+        data = {}
+        try:
+            temp, press, hum = self.bme.values
+            data['TBMP'] = round(temp, 2)
+            data['PBMP'] = round(press, 2)
+            if hum is not None:
+                data['HUM'] = round(hum, 2)
+        except Exception as e:
+            print(f"Error reading BME/BMP sensor: {e}")
+            data['TBMP'], data['PBMP'], data['HUM'] = 0, 0, 0
+
+        if self.ds_rom:
+            self.ds_sensor.convert_temp()
+            await asyncio.sleep_ms(750)
+            data['TDS18'] = round(self.ds_sensor.read_temp(self.ds_rom), 2)
+        else:
+            data['TDS18'] = 0
+
+        data['KTYPE'] = self.k_type.read()
+        return data
+
+# --- Main Application Tasks ---
+async def data_collector_task(npbc, sensors):
+    while True:
+        print("Collecting data...")
+        try:
+            burner_data = await npbc.get_general_information()
+            sensor_data = await sensors.read_all()
+
+            app_state['burner'] = burner_data
+            app_state['sensors'] = sensor_data
+            app_state['last_update'] = f"{time.localtime()[3]:02d}:{time.localtime()[4]:02d}:{time.localtime()[5]:02d}"
+
+            full_data = {**burner_data, **sensor_data}
+            try:
+                requests.post(config.REMOTE_POST_URL, json=full_data, headers = {'content-type': 'application/json'})
+                print("Data posted successfully.")
+            except Exception as e:
+                print(f"Host unreachable: {e}")
+        except Exception as e:
+            print(f"Error in data collection: {e}")
+
+        gc.collect()
+        await asyncio.sleep(30)
+
+# --- Web Server Setup ---
+app = Microdot()
+Response.default_content_type = 'text/html'
+
+def format_burner_data(data):
+    if not data or 'Mode' not in data: return data
+    modes = {0: 'Standby', 1: 'Auto', 2: 'Timer'}
+    states = {0: 'CH Priority', 1: 'DHW Priority', 2: 'Parallel Pumps', 3: 'Summer Mode'}
+    powers = {0: '', 1: '/ Suspend', 2: '/ Power 1', 3: '/ Power 2', 4: '/ Power 3'}
+    statuses = {0: 'Idle', 1: 'Fan Cleaning', 2: 'Cleaner', 3: 'Wait', 4: 'Loading', 5: 'Heating', 6: 'Ignition1', 7: 'Ignition2', 8: 'Unfolding', 9: 'Burning', 10: 'Extinction', 11: 'Standby/Extinct'}
+    formatted = data.copy()
+    formatted['Mode'] = modes.get(data.get('Mode'), 'Unknown')
+    formatted['State'] = states.get(data.get('State'), 'Unknown')
+    formatted['Power'] = powers.get(data.get('Power'), 'Unknown')
+    formatted['Status'] = statuses.get(data.get('Status'), 'Unknown')
+    formatted['DHWPump'] = "On" if data.get('DHWPump') else "Off"
+    formatted['CHPump'] = "On" if data.get('CHPump') else "Off"
+    return formatted
+
+@app.route('/')
+async def index(request):
+    return send_file('templates/index.html')
+
+@app.route('/static/<path:path>')
+def static(request, path):
+    return send_file(f'static/{path}')
+
+@app.route('/api/data')
+async def api_data(request):
+    full_state = {
+        'burner': format_burner_data(app_state.get('burner', {})),
+        'sensors': app_state.get('sensors', {}),
+        'last_update': app_state.get('last_update')
+    }
+    return Response(json.dumps(full_state), headers={'Content-Type': 'application/json'})
+
+@app.route('/api/settings', methods=['POST'])
+async def api_settings(request):
+    data = request.json
+    mode, priority = data.get('mode'), data.get('priority')
+    if mode is not None and priority is not None:
+        success = await npbc_controller.set_mode_and_priority(int(mode), int(priority))
+        return Response({'status': 'ok' if success else 'failed'}, 200 if success else 500)
+    return Response({'status': 'bad request'}, 400)
+
+@app.route('/api/update', methods=['POST'])
+async def api_update(request):
+    print("OTA update requested.")
+    try:
+        success, message = ota_updater.download_and_install_update_if_available()
+        return Response({'status': 'success' if success else 'no_update', 'message': message}, 200)
+    except Exception as e:
+        print(f"OTA update failed with exception: {e}")
+        return Response({'status': 'error', 'message': str(e)}, 500)
+
+# --- Main Execution ---
+npbc_controller = NPBCController(tx_pin=config.PIN_UART2_TX, rx_pin=config.PIN_UART2_RX)
+sensor_reader = SensorReader()
+
+async def main():
+    print("Checking for updates on boot...")
+    asyncio.create_task(ota_updater.download_and_install_update_if_available())
+    print("Starting data collector task...")
+    asyncio.create_task(data_collector_task(npbc_controller, sensor_reader))
+    
+    ip_addr = network.WLAN(network.STA_IF).ifconfig()[0]
+    print(f'Starting web server on http://{ip_addr}')
+    await app.start_server(port=80, debug=True)
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

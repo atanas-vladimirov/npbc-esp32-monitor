@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "files": [
+    "main.py",
+    "boot.py",
+    "config.py",
+    "lib/npbc.py",
+    "lib/ota.py",
+    "drivers/bme280_driver.py",
+    "drivers/max6675.py",
+    "templates/index.html",
+    "static/style.css"
+  ]
+}

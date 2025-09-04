@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Monitor</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ESP32 Pellet Burner Monitor</h1>
+            <div class="header-right">
+                <span id="last-update">Last update: ...</span>
+                <button id="theme-toggle">🌙</button>
+            </div>
+        </header>
+        <main>
+            <div class="card-grid">
+                <div class="card">
+                    <h2>Burner Status</h2>
+                    <p><strong>Mode:</strong> <span id="burner-mode">...</span></p>
+                    <p><strong>State:</strong> <span id="burner-state">...</span></p>
+                    <p><strong>Status:</strong> <span id="burner-status">...</span></p>
+                    <p><strong>Power:</strong> <span id="burner-power">...</span></p>
+                    <p><strong>Flame Strength:</strong> <span id="burner-flame">...</span></p>
+                </div>
+                <div class="card">
+                    <h2>Temperatures</h2>
+                    <p><strong>Boiler (Actual):</strong> <span id="temp-boiler">...</span> &deg;C</p>
+                    <p><strong>Boiler (Set):</strong> <span id="temp-set">...</span> &deg;C</p>
+                    <p><strong>DHW:</strong> <span id="temp-dhw">...</span> &deg;C</p>
+                    <p><strong>Return Water (DS18):</strong> <span id="temp-tds18">...</span> &deg;C</p>
+                    <p><strong>Exhaust Gas (K-Type):</strong> <span id="temp-ktype">...</span> &deg;C</p>
+                    <p><strong>Ambient (BMP):</strong> <span id="temp-tbmp">...</span> &deg;C</p>
+                </div>
+                <div class="card">
+                    <h2>System & Pumps</h2>
+                    <p><strong>DHW Pump:</strong> <span id="pump-dhw">...</span></p>
+                    <p><strong>CH Pump:</strong> <span id="pump-ch">...</span></p>
+                    <p><strong>Fan Speed:</strong> <span id="fan-speed">...</span> %</p>
+                    <p><strong>Ambient Pressure:</strong> <span id="pressure-pbmp">...</span> hPa</p>
+                    <p><strong>Ambient Humidity:</strong> <span id="humidity">...</span> %</p>
+                    <p><strong>SW Version:</strong> <span id="sw-ver">...</span></p>
+                </div>
+                <div class="card">
+                    <h2>Controls</h2>
+                    <form id="settings-form">
+                        <div class="form-group">
+                            <label for="mode-select">Mode:</label>
+                            <select id="mode-select" name="mode">
+                                <option value="0">Standby</option>
+                                <option value="1">Auto</option>
+                                <option value="2">Timer</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="priority-select">Priority:</label>
+                            <select id="priority-select" name="priority">
+                                <option value="0">CH Priority</option>
+                                <option value="1">DHW Priority</option>
+                                <option value="2">Parallel Pumps</option>
+                                <option value="3">Summer Mode</option>
+                            </select>
+                        </div>
+                        <button type="submit">Set Mode & Priority</button>
+                    </form>
+                    <p id="form-status"></p>
+                    <div class="update-section">
+                        <hr>
+                        <button id="update-button">Check for Updates</button>
+                        <p id="update-status"></p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script>
+        const themeToggle = document.getElementById('theme-toggle');
+        const body = document.body;
+        if (localStorage.getItem('theme') === 'dark') {
+            body.classList.add('dark-mode');
+            themeToggle.textContent = '☀️';
+        }
+        themeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            if (body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+                themeToggle.textContent = '☀️';
+            } else {
+                localStorage.setItem('theme', 'light');
+                themeToggle.textContent = '🌙';
+            }
+        });
+        function updateUI(data) {
+            const burner = data.burner || {};
+            const sensors = data.sensors || {};
+            document.getElementById('last-update').textContent = `Last update: ${data.last_update || '...'}`;
+            document.getElementById('burner-mode').textContent = burner.Mode || 'N/A';
+            document.getElementById('burner-state').textContent = burner.State || 'N/A';
+            document.getElementById('burner-status').textContent = burner.Status || 'N/A';
+            document.getElementById('burner-power').textContent = burner.Power || 'N/A';
+            document.getElementById('burner-flame').textContent = burner.Flame || 'N/A';
+            document.getElementById('temp-boiler').textContent = burner.Tboiler || 'N/A';
+            document.getElementById('temp-set').textContent = burner.Tset || 'N/A';
+            document.getElementById('temp-dhw').textContent = burner.DHW || 'N/A';
+            document.getElementById('temp-tds18').textContent = sensors.TDS18 || 'N/A';
+            document.getElementById('temp-ktype').textContent = sensors.KTYPE || 'N/A';
+            document.getElementById('temp-tbmp').textContent = sensors.TBMP || 'N/A';
+            document.getElementById('pump-dhw').textContent = burner.DHWPump || 'N/A';
+            document.getElementById('pump-ch').textContent = burner.CHPump || 'N/A';
+            document.getElementById('fan-speed').textContent = burner.Fan || 'N/A';
+            document.getElementById('pressure-pbmp').textContent = sensors.PBMP || 'N/A';
+            document.getElementById('humidity').textContent = sensors.HUM || 'N/A';
+            document.getElementById('sw-ver').textContent = burner.SwVer || 'N/A';
+        }
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/data');
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                updateUI(data);
+            } catch (error) {
+                console.error('Failed to fetch data:', error);
+            }
+        }
+        const settingsForm = document.getElementById('settings-form');
+        const formStatus = document.getElementById('form-status');
+        settingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            formStatus.textContent = 'Sending...';
+            const formData = new FormData(settingsForm);
+            const data = {
+                mode: parseInt(formData.get('mode'), 10),
+                priority: parseInt(formData.get('priority'), 10)
+            };
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (response.ok) {
+                    formStatus.textContent = 'Settings updated!';
+                } else { throw new Error('Failed to update settings'); }
+            } catch (error) {
+                console.error(error);
+                formStatus.textContent = 'Error sending settings.';
+            }
+            setTimeout(() => { formStatus.textContent = ''; }, 3000);
+        });
+        const updateButton = document.getElementById('update-button');
+        const updateStatus = document.getElementById('update-status');
+        updateButton.addEventListener('click', async () => {
+            updateStatus.textContent = 'Checking for updates...';
+            updateButton.disabled = true;
+            try {
+                const response = await fetch('/api/update', { method: 'POST' });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    updateStatus.textContent = 'Update successful! Rebooting...';
+                } else {
+                    updateStatus.textContent = result.message;
+                }
+            } catch (error) {
+                console.error('Update failed:', error);
+                updateStatus.textContent = 'An error occurred during the update.';
+            } finally {
+                setTimeout(() => {
+                    updateButton.disabled = false;
+                    updateStatus.textContent = '';
+                }, 5000);
+            }
+        });
+        setInterval(fetchData, 5000);
+        fetchData();
+    </script>
+</body>
+</html>
