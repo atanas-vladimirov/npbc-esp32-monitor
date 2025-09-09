@@ -14,6 +14,7 @@ from microdot_asyncio import Microdot, Response, send_file
 import config
 from lib.npbc import NPBCController
 from lib.ota import OTAUpdater
+from lib.scheduler import Scheduler
 from drivers.max6675 import MAX6675
 from drivers.bme280_driver import BME280
 import onewire
@@ -28,6 +29,9 @@ app_state = {
 
 # --- OTA Updater Instance ---
 ota_updater = OTAUpdater(config.GITHUB_REPO, main_dir='.')
+
+# --- Scheduler Instance ---
+scheduler = Scheduler()
 
 # --- Sensor Reading Classes ---
 class SensorReader:
@@ -93,6 +97,70 @@ async def data_collector_task(npbc, sensors):
         gc.collect()
         await asyncio.sleep(30)
 
+# --- Scheduler Task ---
+async def scheduler_task(npbc, sensor_reader):
+    """
+    Runs every minute to check and execute schedules.
+    """
+    while True:
+        try:
+            current_time = time.localtime()
+            current_hour = current_time[3]
+            current_minute = current_time[4]
+            # tm_wday: Monday is 0 and Sunday is 6
+            current_day_of_week = current_time[6]
+
+            current_temp = app_state.get('sensors', {}).get('TBMP', 999)
+
+            schedules = scheduler.get_schedules()
+
+            for sched in schedules:
+                if not sched.get('enabled', False):
+                    continue
+
+                # Check if today is a scheduled day
+                if not sched['days'][current_day_of_week]:
+                    continue
+
+                # --- Check for ON time ---
+                on_hour, on_minute = map(int, sched['on_time'].split(':'))
+                if on_hour == current_hour and on_minute == current_minute:
+                    print(f"Scheduler: Matched ON time for '{sched['name']}'")
+
+                    # Check temperature condition
+                    temp_ok = False
+                    condition = sched.get('temp_condition', 'none')
+                    threshold = sched.get('temp_threshold', 0)
+
+                    if condition == 'none':
+                        temp_ok = True
+                    elif condition == 'below' and current_temp < threshold:
+                        temp_ok = True
+                        print(f"Temp condition met: {current_temp}°C is below {threshold}°C")
+                    elif condition == 'above' and current_temp > threshold:
+                        temp_ok = True
+                        print(f"Temp condition met: {current_temp}°C is above {threshold}°C")
+
+                    if temp_ok:
+                        print(f"Executing ON action for '{sched['name']}'")
+                        # Set Mode to Auto (1) with the specified priority
+                        await npbc.set_mode_and_priority(1, sched['priority_on'])
+                    else:
+                        print(f"Temp condition NOT met for '{sched['name']}'. Skipping.")
+
+                # --- Check for OFF time ---
+                off_hour, off_minute = map(int, sched['off_time'].split(':'))
+                if off_hour == current_hour and off_minute == current_minute:
+                    print(f"Scheduler: Matched OFF time for '{sched['name']}'. Executing OFF action.")
+                    # Set Mode to Standby (0)
+                    await npbc.set_mode_and_priority(0, 0)
+
+        except Exception as e:
+            print(f"Error in scheduler task: {e}")
+
+        # Wait 60 seconds before the next check
+        await asyncio.sleep(60)
+
 # --- Web Server Setup ---
 app = Microdot()
 Response.default_content_type = 'text/html'
@@ -129,6 +197,28 @@ async def api_data(request):
     }
     return Response(json.dumps(full_state), headers={'Content-Type': 'application/json'})
 
+@app.route('/api/schedules', methods=['GET'])
+async def get_schedules(request):
+    return Response(json.dumps(scheduler.get_schedules()), headers={'Content-Type': 'application/json'})
+
+@app.route('/api/schedules', methods=['POST'])
+async def save_schedule(request):
+    data = request.json
+    schedule_id = data.get('id')
+    if schedule_id:
+        updated = scheduler.update_schedule(schedule_id, data)
+        return Response(json.dumps(updated), 200)
+    else:
+        new_sched = scheduler.add_schedule(data)
+        return Response(json.dumps(new_sched), 201) # 201 Created
+
+@app.route('/api/schedules/<schedule_id>', methods=['DELETE'])
+async def delete_schedule(request, schedule_id):
+    if scheduler.delete_schedule(int(schedule_id)):
+        return Response({'status': 'ok'}, 200)
+    else:
+        return Response({'status': 'not_found'}, 404)
+
 @app.route('/api/settings', methods=['POST'])
 async def api_settings(request):
     data = request.json
@@ -153,11 +243,18 @@ npbc_controller = NPBCController(tx_pin=config.PIN_UART2_TX, rx_pin=config.PIN_U
 sensor_reader = SensorReader()
 
 async def main():
+    # Load schedules from flash memory at startup
+    scheduler.load_schedules()
+
     print("Checking for updates on boot...")
     asyncio.create_task(ota_updater.download_and_install_update_if_available())
+
     print("Starting data collector task...")
     asyncio.create_task(data_collector_task(npbc_controller, sensor_reader))
-    
+
+    print("Starting scheduler task...")
+    asyncio.create_task(scheduler_task(npbc_controller, sensor_reader))
+
     ip_addr = network.WLAN(network.STA_IF).ifconfig()[0]
     print(f'Starting web server on http://{ip_addr}')
     await app.start_server(port=80, debug=True)

@@ -82,3 +82,123 @@ button[type="submit"]:hover { background-color: #2980b9; }
 #update-button:hover { background-color: var(--accent-color); color: #fff; }
 #update-button:disabled { opacity: 0.5; cursor: not-allowed; }
 #update-status { margin-top: 1rem; font-style: italic; color: var(--accent-color); }
+
+/* Tabs */
+.tabs {
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1.5rem;
+}
+.tab-link {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    padding: 1rem 1.2rem;
+    transition: color 0.2s, border-bottom 0.2s;
+    font-size: 1rem;
+    color: var(--text-color);
+    border-bottom: 3px solid transparent;
+}
+.tab-link:hover {
+    color: var(--accent-color);
+}
+.tab-link.active {
+    color: var(--accent-color);
+    border-bottom: 3px solid var(--accent-color);
+}
+.tab-content {
+    display: none;
+    animation: fadeIn 0.5s;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Scheduler */
+.scheduler-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+.scheduler-header h2 {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+#add-schedule-btn {
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: 5px;
+    background-color: var(--accent-color);
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+#add-schedule-btn:hover { background-color: #2980b9; }
+
+.schedule-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.schedule-item.disabled {
+    opacity: 0.5;
+}
+.schedule-item:last-child {
+    border-bottom: none;
+}
+.schedule-info { display: flex; flex-direction: column; gap: 0.2rem; }
+.schedule-info strong { font-size: 1.1rem; }
+.schedule-info span { font-size: 0.9rem; color: #888; }
+body.dark-mode .schedule-info span { color: #aaa; }
+.schedule-days { font-family: monospace; }
+.schedule-actions button {
+    padding: 0.5rem 0.8rem;
+    margin-left: 0.5rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.edit-btn { border: 1px solid var(--accent-color); background: transparent; color: var(--accent-color); }
+.delete-btn { border: 1px solid #e74c3c; background: transparent; color: #e74c3c; }
+
+/* Modal */
+.modal-overlay {
+    position: fixed; z-index: 1000; left: 0; top: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+}
+.modal-content {
+    background-color: var(--card-bg-color);
+    padding: 2rem;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+}
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+.days-selector {
+    display: flex; justify-content: space-around;
+    background-color: var(--bg-color); padding: 0.5rem; border-radius: 5px;
+}
+.days-selector span { display: inline-flex; align-items: center; }
+.days-selector input { margin-right: 0.3rem; }
+.modal-actions {
+    display: flex; justify-content: flex-end;
+    gap: 1rem; margin-top: 1.5rem;
+}
+.modal-actions button {
+    padding: 0.7rem 1.5rem;
+}
+#modal-cancel {
+    background-color: transparent; border: 1px solid var(--border-color); color: var(--text-color);
+}
