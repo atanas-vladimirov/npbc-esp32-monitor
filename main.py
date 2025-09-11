@@ -85,7 +85,8 @@ async def data_collector_task(npbc, sensors):
             app_state['sensors'] = sensor_data
             app_state['last_update'] = f"{time.localtime()[3]:02d}:{time.localtime()[4]:02d}:{time.localtime()[5]:02d}"
 
-            full_data = {**burner_data, **sensor_data}
+            full_data = burner_data.copy()
+            full_data.update(sensor_data)
             try:
                 requests.post(config.REMOTE_POST_URL, json=full_data, headers = {'content-type': 'application/json'})
                 print("Data posted successfully.")
