@@ -138,16 +138,14 @@ Review `config.py` and edit the `GITHUB_REPO` URL to point to your public GitHub
 
 6.  Install Dependencies
 ------------------------
-Connect to your ESP32's REPL (e.g., via Thonny or `rshell`). Ensure the device is connected to the internet, then run the following commands to install the required libraries:
+Connect to your ESP32's REPL (e.g., via Thonny or `mpremote`). Ensure the device is connected to the internet, then run the following commands to install the required libraries:
 
 .. code-block:: python
 
     import mip
 
-    mip.install("microdot")
     mip.install("urequests")
     mip.install("onewire")
-    mip.install("micropython-ds18x20")
 
 7.  Reboot & Verify
 -------------------

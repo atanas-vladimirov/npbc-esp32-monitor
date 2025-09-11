@@ -8,7 +8,7 @@ import network
 import time
 
 # Web framework
-from microdot_asyncio import Microdot, Response, send_file
+from microdot import Microdot, Response, send_file
 
 # App-specific imports
 import config
@@ -258,7 +258,7 @@ async def main():
 
     ip_addr = network.WLAN(network.STA_IF).ifconfig()[0]
     print(f'Starting web server on http://{ip_addr}')
-    await app.start_server(port=80, debug=True)
+    await app.run(port=80, debug=True)
 
 if __name__ == "__main__":
     try:
