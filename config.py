@@ -17,10 +17,10 @@ GITHUB_REPO = 'https://github.com/atanas-vladimirov/npbc-esp32-monitor'
 
 # --- Pin Assignments ---
 # (Pin assignments remain the same as before)
-PIN_SPI_SCK = 14
-PIN_SPI_MOSI = 13
-PIN_SPI_MISO = 12
-PIN_BME_CS = 15
+PIN_SPI_SCK = 14    # SCL
+PIN_SPI_MOSI = 13   # SDA
+PIN_SPI_MISO = 12   # SDO
+PIN_BME_CS = 15     # CSB
 
 PIN_DS18X20 = 4
 
