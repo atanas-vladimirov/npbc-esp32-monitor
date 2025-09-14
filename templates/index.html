@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"> <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Monitor</title>
@@ -101,7 +100,65 @@
         <main>
             <div id="dashboard" class="tab-content" style="display: block;">
                 <div class="card-grid">
+                    <div class="card">
+                        <h2>Burner Status</h2>
+                        <p><strong>Mode:</strong> <span id="burner-mode">...</span></p>
+                        <p><strong>State:</strong> <span id="burner-state">...</span></p>
+                        <p><strong>Status:</strong> <span id="burner-status">...</span></p>
+                        <p><strong>Power:</strong> <span id="burner-power">...</span></p>
+                        <p><strong>Flame Strength:</strong> <span id="burner-flame">...</span></p>
                     </div>
+
+                    <div class="card">
+                        <h2>Temperatures</h2>
+                        <p><strong>Boiler (Actual):</strong> <span id="temp-boiler">...</span> &deg;C</p>
+                        <p><strong>Boiler (Set):</strong> <span id="temp-set">...</span> &deg;C</p>
+                        <p><strong>DHW:</strong> <span id="temp-dhw">...</span> &deg;C</p>
+                        <p><strong>Return Water (DS18):</strong> <span id="temp-tds18">...</span> &deg;C</p>
+                        <p><strong>Exhaust Gas (K-Type):</strong> <span id="temp-ktype">...</span> &deg;C</p>
+                        <p><strong>Ambient (BMP):</strong> <span id="temp-tbmp">...</span> &deg;C</p>
+                    </div>
+
+                    <div class="card">
+                        <h2>System & Pumps</h2>
+                        <p><strong>DHW Pump:</strong> <span id="pump-dhw">...</span></p>
+                        <p><strong>CH Pump:</strong> <span id="pump-ch">...</span></p>
+                        <p><strong>Fan Speed:</strong> <span id="fan-speed">...</span> %</p>
+                        <p><strong>Ambient Pressure:</strong> <span id="pressure-pbmp">...</span> hPa</p>
+                        <p><strong>Ambient Humidity:</strong> <span id="humidity">...</span> %</p>
+                        <p><strong>SW Version:</strong> <span id="sw-ver">...</span></p>
+                    </div>
+
+                    <div class="card">
+                        <h2>Controls</h2>
+                        <form id="settings-form">
+                            <div class="form-group">
+                                <label for="mode-select">Mode:</label>
+                                <select id="mode-select" name="mode">
+                                    <option value="0">Standby</option>
+                                    <option value="1">Auto</option>
+                                    <option value="2">Timer</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="priority-select">Priority:</label>
+                                <select id="priority-select" name="priority">
+                                    <option value="0">CH Priority</option>
+                                    <option value="1">DHW Priority</option>
+                                    <option value="2">Parallel Pumps</option>
+                                    <option value="3">Summer Mode</option>
+                                </select>
+                            </div>
+                            <button type="submit">Set Mode & Priority</button>
+                        </form>
+                        <p id="form-status"></p>
+                        <div class="update-section">
+                            <hr>
+                            <button id="update-button">Check for Updates</button>
+                            <p id="update-status"></p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="scheduler" class="tab-content">
@@ -116,24 +173,17 @@
             </div>
         </main>
     </div>
+
     <script>
-        // This is the main script block at the end of the body.
-        
-        // --- THEME TOGGLE LOGIC (UPDATED) ---
+        // --- THEME TOGGLE LOGIC ---
         const themeToggle = document.getElementById('theme-toggle');
-        
-        // Set the initial button icon based on the theme applied by the head script.
-        // We check the <html> tag, not the body.
         if (document.documentElement.classList.contains('dark-mode')) {
             themeToggle.textContent = '☀️';
         } else {
             themeToggle.textContent = '🌙';
         }
-
         themeToggle.addEventListener('click', () => {
-            // Toggle the class on the root <html> element
             document.documentElement.classList.toggle('dark-mode');
-
             if (document.documentElement.classList.contains('dark-mode')) {
                 localStorage.setItem('theme', 'dark');
                 themeToggle.textContent = '☀️';
@@ -143,7 +193,7 @@
             }
         });
 
-        // Tab functionality
+        // --- TAB SWITCHING LOGIC ---
         function openTab(evt, tabName) {
             let i, tabcontent, tablinks;
             tabcontent = document.getElementsByClassName("tab-content");
@@ -158,13 +208,98 @@
             evt.currentTarget.className += " active";
         }
 
-        // Scheduler UI logic
+        // --- DATA FETCHING AND UI UPDATING ---
+        function updateUI(data) {
+            const burner = data.burner || {};
+            const sensors = data.sensors || {};
+            document.getElementById('last-update').textContent = `Last update: ${data.last_update || '...'}`;
+            document.getElementById('burner-mode').textContent = burner.Mode || 'N/A';
+            document.getElementById('burner-state').textContent = burner.State || 'N/A';
+            document.getElementById('burner-status').textContent = burner.Status || 'N/A';
+            document.getElementById('burner-power').textContent = burner.Power || 'N/A';
+            document.getElementById('burner-flame').textContent = burner.Flame || 'N/A';
+            document.getElementById('temp-boiler').textContent = burner.Tboiler || 'N/A';
+            document.getElementById('temp-set').textContent = burner.Tset || 'N/A';
+            document.getElementById('temp-dhw').textContent = burner.DHW || 'N/A';
+            document.getElementById('temp-tds18').textContent = sensors.TDS18 || 'N/A';
+            document.getElementById('temp-ktype').textContent = sensors.KTYPE || 'N/A';
+            document.getElementById('temp-tbmp').textContent = sensors.TBMP || 'N/A';
+            document.getElementById('pump-dhw').textContent = burner.DHWPump || 'N/A';
+            document.getElementById('pump-ch').textContent = burner.CHPump || 'N/A';
+            document.getElementById('fan-speed').textContent = burner.Fan || 'N/A';
+            document.getElementById('pressure-pbmp').textContent = sensors.PBMP || 'N/A';
+            document.getElementById('humidity').textContent = sensors.HUM || 'N/A';
+            document.getElementById('sw-ver').textContent = burner.SwVer || 'N/A';
+        }
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/data');
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                updateUI(data);
+            } catch (error) {
+                console.error('Failed to fetch data:', error);
+            }
+        }
+
+        // --- SETTINGS FORM LOGIC ---
+        const settingsForm = document.getElementById('settings-form');
+        const formStatus = document.getElementById('form-status');
+        settingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            formStatus.textContent = 'Sending...';
+            const formData = new FormData(settingsForm);
+            const data = {
+                mode: parseInt(formData.get('mode'), 10),
+                priority: parseInt(formData.get('priority'), 10)
+            };
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (response.ok) {
+                    formStatus.textContent = 'Settings updated!';
+                } else { throw new Error('Failed to update settings'); }
+            } catch (error) {
+                console.error(error);
+                formStatus.textContent = 'Error sending settings.';
+            }
+            setTimeout(() => { formStatus.textContent = ''; }, 3000);
+        });
+
+        // --- OTA UPDATE LOGIC ---
+        const updateButton = document.getElementById('update-button');
+        const updateStatus = document.getElementById('update-status');
+        updateButton.addEventListener('click', async () => {
+            updateStatus.textContent = 'Checking for updates...';
+            updateButton.disabled = true;
+            try {
+                const response = await fetch('/api/update', { method: 'POST' });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    updateStatus.textContent = 'Update successful! Rebooting...';
+                } else {
+                    updateStatus.textContent = result.message;
+                }
+            } catch (error) {
+                console.error('Update failed:', error);
+                updateStatus.textContent = 'An error occurred during the update.';
+            } finally {
+                setTimeout(() => {
+                    updateButton.disabled = false;
+                    updateStatus.textContent = '';
+                }, 5000);
+            }
+        });
+
+        // --- SCHEDULER UI LOGIC ---
         const modal = document.getElementById('schedule-modal');
         const addScheduleBtn = document.getElementById('add-schedule-btn');
         const modalCancelBtn = document.getElementById('modal-cancel');
         const scheduleForm = document.getElementById('schedule-form');
         const scheduleListDiv = document.getElementById('schedule-list');
-
         let schedules = [];
 
         function renderSchedules() {
@@ -175,12 +310,11 @@
             }
             schedules.forEach(sched => {
                 const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-                const activeDays = sched.days.map((d, i) => d ? days[i] : '_').join(' ');
+                const activeDays = sched.days.map((d, i) => d ? `<strong>${days[i]}</strong>` : `<span>${days[i]}</span>`).join(' ');
                 let tempRule = 'Always';
                 if(sched.temp_condition !== 'none') {
-                    tempRule = `If Temp ${sched.temp_condition === 'below' ? '<' : '>'} ${sched.temp_threshold}°C`;
+                    tempRule = `If Temp ${sched.temp_condition === 'below' ? '&lt;' : '&gt;'} ${sched.temp_threshold}°C`;
                 }
-
                 const schedDiv = document.createElement('div');
                 schedDiv.className = 'schedule-item' + (sched.enabled ? '' : ' disabled');
                 schedDiv.innerHTML = `
@@ -198,7 +332,6 @@
                 scheduleListDiv.appendChild(schedDiv);
             });
         }
-
         async function fetchSchedules() {
             try {
                 const response = await fetch('/api/schedules');
@@ -206,7 +339,6 @@
                 renderSchedules();
             } catch (e) { console.error('Failed to fetch schedules', e); }
         }
-
         function openModal(schedule = null) {
             scheduleForm.reset();
             document.getElementById('schedule-temp-threshold').style.display = 'none';
@@ -231,22 +363,14 @@
             }
             modal.style.display = 'flex';
         }
-
-        function closeModal() {
-            modal.style.display = 'none';
-        }
-
+        function closeModal() { modal.style.display = 'none'; }
         addScheduleBtn.addEventListener('click', () => openModal());
         modalCancelBtn.addEventListener('click', closeModal);
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeModal();
-        });
-
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
         document.getElementById('schedule-temp-condition').addEventListener('change', (e) => {
             const thresholdInput = document.getElementById('schedule-temp-threshold');
             thresholdInput.style.display = e.target.value === 'none' ? 'none' : 'block';
         });
-
         scheduleForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const days = Array.from({length: 7}, (_, i) => document.getElementById(`day-${i}`).checked);
@@ -261,7 +385,6 @@
                 priority_on: parseInt(document.getElementById('schedule-priority-on').value),
                 enabled: document.getElementById('schedule-enabled').checked
             };
-
             try {
                 await fetch('/api/schedules', {
                     method: 'POST',
@@ -272,7 +395,6 @@
                 closeModal();
             } catch (err) { console.error('Failed to save schedule', err); }
         });
-
         scheduleListDiv.addEventListener('click', async (e) => {
             if (e.target.classList.contains('edit-btn')) {
                 const id = parseInt(e.target.dataset.id);
@@ -290,10 +412,12 @@
             }
         });
 
-        // Initial load
+        // --- INITIAL LOAD ---
         document.addEventListener('DOMContentLoaded', () => {
             fetchSchedules();
+            fetchData();
         });
+        setInterval(fetchData, 5000);
     </script>
 </body>
 </html>
