@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Monitor</title>
     <link rel="stylesheet" href="/static/style.css">
+
+    <script>
+        // This script runs immediately to prevent the flash of the light theme.
+        // It makes the dark theme the default.
+        (function() {
+            // Check if 'light' is explicitly saved, otherwise default to dark.
+            if (localStorage.getItem('theme') === 'light') {
+                // Do nothing, the default CSS is light theme.
+            } else {
+                // Apply dark theme by adding the class to the root <html> element.
+                document.documentElement.classList.add('dark-mode');
+            }
+        })();
+    </script>
 </head>
 <body>
     <div id="schedule-modal" class="modal-overlay" style="display: none;">
@@ -103,9 +117,31 @@
         </main>
     </div>
     <script>
-        // ... (existing script content like theme toggle, fetchData, etc.)
+        // This is the main script block at the end of the body.
+        
+        // --- THEME TOGGLE LOGIC (UPDATED) ---
+        const themeToggle = document.getElementById('theme-toggle');
+        
+        // Set the initial button icon based on the theme applied by the head script.
+        // We check the <html> tag, not the body.
+        if (document.documentElement.classList.contains('dark-mode')) {
+            themeToggle.textContent = '☀️';
+        } else {
+            themeToggle.textContent = '🌙';
+        }
 
-        // --- NEW SCRIPT FOR TABS AND SCHEDULER ---
+        themeToggle.addEventListener('click', () => {
+            // Toggle the class on the root <html> element
+            document.documentElement.classList.toggle('dark-mode');
+
+            if (document.documentElement.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+                themeToggle.textContent = '☀️';
+            } else {
+                localStorage.setItem('theme', 'light');
+                themeToggle.textContent = '🌙';
+            }
+        });
 
         // Tab functionality
         function openTab(evt, tabName) {

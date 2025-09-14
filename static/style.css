@@ -8,7 +8,7 @@
     --border-color: #e0e0e0;
     --shadow-color: rgba(0, 0, 0, 0.05);
 }
-body.dark-mode {
+html.dark-mode {
     --bg-color: #1a1a1a;
     --card-bg-color: #2c2c2c;
     --text-color: #e0e0e0;
@@ -155,7 +155,7 @@ button[type="submit"]:hover { background-color: #2980b9; }
 .schedule-info { display: flex; flex-direction: column; gap: 0.2rem; }
 .schedule-info strong { font-size: 1.1rem; }
 .schedule-info span { font-size: 0.9rem; color: #888; }
-body.dark-mode .schedule-info span { color: #aaa; }
+html.dark-mode body .schedule-info span { color: #aaa; }
 .schedule-days { font-family: monospace; }
 .schedule-actions button {
     padding: 0.5rem 0.8rem;
