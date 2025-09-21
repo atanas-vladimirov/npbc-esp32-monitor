@@ -116,7 +116,9 @@
                         <p><strong>DHW:</strong> <span id="temp-dhw">...</span> &deg;C</p>
                         <p><strong>Return Water (DS18):</strong> <span id="temp-tds18">...</span> &deg;C</p>
                         <p><strong>Exhaust Gas (K-Type):</strong> <span id="temp-ktype">...</span> &deg;C</p>
-                        <p><strong>Ambient (BMP):</strong> <span id="temp-tbmp">...</span> &deg;C</p>
+                        <p><strong>Ambient (<span id="ambient-sensor-type">...</span>):</strong> <span id="temp-tbmp">...</span> &deg;C</p>
+                        <p><strong>Ambient Pressure:</strong> <span id="pressure-pbmp">...</span> hPa</p>
+                        <p id="humidity-row" style="display: none;"><strong>Ambient Humidity:</strong> <span id="humidity">...</span> %</p>
                     </div>
 
                     <div class="card">
@@ -124,8 +126,6 @@
                         <p><strong>DHW Pump:</strong> <span id="pump-dhw">...</span></p>
                         <p><strong>CH Pump:</strong> <span id="pump-ch">...</span></p>
                         <p><strong>Fan Speed:</strong> <span id="fan-speed">...</span> %</p>
-                        <p><strong>Ambient Pressure:</strong> <span id="pressure-pbmp">...</span> hPa</p>
-                        <p><strong>Ambient Humidity:</strong> <span id="humidity">...</span> %</p>
                         <p><strong>SW Version:</strong> <span id="sw-ver">...</span></p>
                     </div>
 
@@ -213,23 +213,40 @@
             const burner = data.burner || {};
             const sensors = data.sensors || {};
             document.getElementById('last-update').textContent = `Last update: ${data.last_update || '...'}`;
+
+            // --- Burner Status Card ---
             document.getElementById('burner-mode').textContent = burner.Mode || 'N/A';
             document.getElementById('burner-state').textContent = burner.State || 'N/A';
             document.getElementById('burner-status').textContent = burner.Status || 'N/A';
             document.getElementById('burner-power').textContent = burner.Power || 'N/A';
-            document.getElementById('burner-flame').textContent = burner.Flame || 'N/A';
+            // Add "lx" unit to flame strength
+            document.getElementById('burner-flame').textContent = (burner.Flame !== undefined ? burner.Flame + ' lx' : 'N/A lx');
+
+            // --- Temperatures Card ---
             document.getElementById('temp-boiler').textContent = burner.Tboiler || 'N/A';
             document.getElementById('temp-set').textContent = burner.Tset || 'N/A';
             document.getElementById('temp-dhw').textContent = burner.DHW || 'N/A';
             document.getElementById('temp-tds18').textContent = sensors.TDS18 || 'N/A';
             document.getElementById('temp-ktype').textContent = sensors.KTYPE || 'N/A';
+            // Set dynamic sensor name
+            document.getElementById('ambient-sensor-type').textContent = sensors.BME_TYPE || 'Sensor';
             document.getElementById('temp-tbmp').textContent = sensors.TBMP || 'N/A';
+            document.getElementById('pressure-pbmp').textContent = sensors.PBMP || 'N/A';
+
+            // --- System & Pumps Card ---
             document.getElementById('pump-dhw').textContent = burner.DHWPump || 'N/A';
             document.getElementById('pump-ch').textContent = burner.CHPump || 'N/A';
             document.getElementById('fan-speed').textContent = burner.Fan || 'N/A';
-            document.getElementById('pressure-pbmp').textContent = sensors.PBMP || 'N/A';
-            document.getElementById('humidity').textContent = sensors.HUM || 'N/A';
             document.getElementById('sw-ver').textContent = burner.SwVer || 'N/A';
+
+            // --- Conditionally display Humidity ---
+            const humidityRow = document.getElementById('humidity-row');
+            if (sensors.HUM !== undefined && sensors.HUM !== null) {
+                document.getElementById('humidity').textContent = sensors.HUM;
+                humidityRow.style.display = ''; // Show the row
+            } else {
+                humidityRow.style.display = 'none'; // Hide the row
+            }
         }
         async function fetchData() {
             try {
