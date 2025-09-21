@@ -69,7 +69,7 @@ Modules & Libraries
 
 Core MicroPython Libraries
 --------------------------
-The following libraries are required and can be installed via `mip`:
+The following libraries are required and are already included:
 
 * `microdot`: The core web framework.
 * `urequests`: Used for posting data to a remote server and by the OTA module.
@@ -110,7 +110,7 @@ Upload all the project files and directories to the root of your ESP32's filesys
 ::
 
     /
-    ├── uftpd.py
+    ├── uftpd.mpy
     ├── boot.py
     ├── main.py
     ├── config.py
@@ -136,18 +136,7 @@ On the ESP32, create a new file named `secrets.py` and add your private credenti
 -----------------------------
 Review `config.py` and edit the `GITHUB_REPO` URL to point to your public GitHub repository for OTA updates. Adjust any pin assignments if your hardware setup is different.
 
-6.  Install Dependencies
-------------------------
-Connect to your ESP32's REPL (e.g., via Thonny or `mpremote`). Ensure the device is connected to the internet, then run the following commands to install the required libraries:
-
-.. code-block:: python
-
-    import mip
-
-    mip.install("urequests")
-    mip.install("onewire")
-
-7.  Reboot & Verify
+6.  Reboot & Verify
 -------------------
 Reboot your ESP32. It should automatically connect to your WiFi network. Check the serial output in your terminal to see the IP address assigned to the device. You can now access the web interface by navigating to that IP address in your browser.
 
