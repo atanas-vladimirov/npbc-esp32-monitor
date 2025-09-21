@@ -36,23 +36,30 @@ scheduler = Scheduler()
 # --- Sensor Reading Classes ---
 class SensorReader:
     def __init__(self):
-        spi = SPI(1, baudrate=2000000, 
+        # 1. Create a single, shared hardware SPI bus
+        spi = SPI(1, baudrate=5000000, # Increased baudrate for faster reads
                   sck=Pin(config.PIN_SPI_SCK), 
                   mosi=Pin(config.PIN_SPI_MOSI), 
                   miso=Pin(config.PIN_SPI_MISO))
-        cs = Pin(config.PIN_BME_CS)
-        self.bme = BME280(spi=spi, cs=cs)
+
+        # 2. Initialize the BME280 with the shared bus and its unique CS pin
+        bme_cs = Pin(config.PIN_BME_CS)
+        self.bme = BME280(spi=spi, cs=bme_cs)
         print(f"Detected Chip ID: {hex(self.bme.chip_id)}. Is BME280: {self.bme.is_bme280}")
 
+        # 3. Initialize the MAX6675 with the SAME shared bus and its unique CS pin
+        self.k_type = MAX6675(spi=spi, cs_pin=config.PIN_MAX6675_CS)
+
+        # DS18X20 initialization (no change)
         ds_pin = Pin(config.PIN_DS18X20)
         self.ds_sensor = ds18x20.DS18X20(onewire.OneWire(ds_pin))
         roms = self.ds_sensor.scan()
         self.ds_rom = roms[0] if roms else None
 
-        self.k_type = MAX6675(config.PIN_MAX6675_SCK, config.PIN_MAX6675_CS, config.PIN_MAX6675_SO)
-
     async def read_all(self):
         data = {}
+        data['BME_TYPE'] = 'BME280' if self.bme.is_bme280 else 'BMP280'
+
         try:
             temp, press, hum = self.bme.values
             data['TBMP'] = round(temp, 2)
@@ -61,7 +68,7 @@ class SensorReader:
                 data['HUM'] = round(hum, 2)
         except Exception as e:
             print(f"Error reading BME/BMP sensor: {e}")
-            data['TBMP'], data['PBMP'], data['HUM'] = 0, 0, 0
+            data['TBMP'], data['PBMP'] = 0, 0
 
         if self.ds_rom:
             self.ds_sensor.convert_temp()
@@ -162,6 +169,24 @@ async def scheduler_task(npbc, sensor_reader):
         # Wait 60 seconds before the next check
         await asyncio.sleep(60)
 
+# --- NEW ASYNC WRAPPER FOR BOOT-TIME UPDATE ---
+async def boot_time_update_check():
+    """
+    Waits for network to be ready, then checks for OTA updates.
+    This is a proper coroutine that can be scheduled.
+    """
+    # Wait 10 seconds to ensure WiFi is fully connected and stable
+    await asyncio.sleep(10)
+
+    print("Checking for updates on boot...")
+    try:
+        # Now we call the synchronous update function.
+        # This will block the event loop temporarily, but only after the
+        # web server and other tasks have already started.
+        ota_updater.download_and_install_update_if_available()
+    except Exception as e:
+        print(f"Boot-time update check failed: {e}")
+
 # --- Web Server Setup ---
 app = Microdot()
 Response.default_content_type = 'text/html'
@@ -247,8 +272,8 @@ async def main():
     # Load schedules from flash memory at startup
     scheduler.load_schedules()
 
-    print("Checking for updates on boot...")
-    asyncio.create_task(ota_updater.download_and_install_update_if_available())
+    #print("Checking for updates on boot...")
+    #asyncio.create_task(boot_time_update_check())
 
     print("Starting data collector task...")
     asyncio.create_task(data_collector_task(npbc_controller, sensor_reader))

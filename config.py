@@ -16,17 +16,16 @@ STATIC_IP = None
 GITHUB_REPO = 'https://github.com/atanas-vladimirov/npbc-esp32-monitor'
 
 # --- Pin Assignments ---
-# (Pin assignments remain the same as before)
-PIN_SPI_SCK = 14    # SCL
-PIN_SPI_MOSI = 13   # SDA
-PIN_SPI_MISO = 12   # SDO
-PIN_BME_CS = 15     # CSB
+# Main Hardware SPI Bus (HSPI)
+PIN_SPI_SCK = 18    # SCL on BME/P 280
+PIN_SPI_MISO = 19   # SDO on BME/P 280
+PIN_SPI_MOSI = 21   # SDA on BME/P 280
 
-PIN_DS18X20 = 4
-
-PIN_MAX6675_SO = 19
-PIN_MAX6675_SCK = 18
+# Unique Chip Select (CS) pin for each SPI device
+PIN_BME_CS = 22     # CSB on BME/P 280
 PIN_MAX6675_CS = 5
 
+# Other Pins
+PIN_DS18X20 = 4
 PIN_UART2_TX = 17
 PIN_UART2_RX = 16
