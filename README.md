@@ -33,7 +33,7 @@ All this data is consolidated and presented on a self-hosted web page, accessibl
 
 
 Implementation Details
-====================
+======================
 
 Core Architecture
 -----------------

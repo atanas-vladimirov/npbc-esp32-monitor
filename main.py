@@ -3,7 +3,7 @@ import gc
 import json
 import uasyncio as asyncio
 import urequests as requests
-from machine import Pin, SPI
+from machine import Pin, SPI, reset
 import network
 import time
 
@@ -19,6 +19,7 @@ from drivers.max6675 import MAX6675
 from drivers.bme280_driver import BME280
 import onewire
 import ds18x20
+import math
 
 # --- State Management ---
 app_state = {
@@ -36,21 +37,29 @@ scheduler = Scheduler()
 # --- Sensor Reading Classes ---
 class SensorReader:
     def __init__(self):
-        # 1. Create a single, shared hardware SPI bus
-        spi = SPI(1, baudrate=5000000, # Increased baudrate for faster reads
+
+        spi1 = SPI(1, baudrate=100000,
                   sck=Pin(config.PIN_SPI_SCK), 
-                  mosi=Pin(config.PIN_SPI_MOSI), 
                   miso=Pin(config.PIN_SPI_MISO))
 
-        # 2. Initialize the BME280 with the shared bus and its unique CS pin
-        bme_cs = Pin(config.PIN_BME_CS)
-        self.bme = BME280(spi=spi, cs=bme_cs)
-        print(f"Detected Chip ID: {hex(self.bme.chip_id)}. Is BME280: {self.bme.is_bme280}")
+        spi2 = SPI(2, baudrate=100000,
+                  sck=Pin(config.PIN_BME_SCK), 
+                  mosi=Pin(config.PIN_BME_MOSI), 
+                  miso=Pin(config.PIN_BME_MISO))
 
-        # 3. Initialize the MAX6675 with the SAME shared bus and its unique CS pin
-        self.k_type = MAX6675(spi=spi, cs_pin=config.PIN_MAX6675_CS)
+        try:
+            # Try to initialize the BME/BMP sensor
+            bme_cs = Pin(config.PIN_BME_CS)
+            self.bme = BME280(spi=spi2, cs=bme_cs)
+            print(f"Detected Chip ID: {hex(self.bme.chip_id)}. Is BME280: {self.bme.is_bme280}")
+        except OSError as e:
+            # If it fails (e.g., not connected), set the object to None
+            print(f"BME/BMP sensor not found. Continuing without it. Error: {e}")
+            self.bme = None
 
-        # DS18X20 initialization (no change)
+        # The rest of the sensors initialize as normal
+        self.k_type = MAX6675(spi=spi1, cs_pin=config.PIN_MAX6675_CS)
+
         ds_pin = Pin(config.PIN_DS18X20)
         self.ds_sensor = ds18x20.DS18X20(onewire.OneWire(ds_pin))
         roms = self.ds_sensor.scan()
@@ -58,18 +67,29 @@ class SensorReader:
 
     async def read_all(self):
         data = {}
-        data['BME_TYPE'] = 'BME280' if self.bme.is_bme280 else 'BMP280'
 
-        try:
-            temp, press, hum = self.bme.values
-            data['TBMP'] = round(temp, 2)
-            data['PBMP'] = round(press, 2)
-            if hum is not None:
-                data['HUM'] = round(hum, 2)
-        except Exception as e:
-            print(f"Error reading BME/BMP sensor: {e}")
-            data['TBMP'], data['PBMP'] = 0, 0
+        # --- Check if the sensor exists before reading ---
+        if self.bme:
+            # Sensor was found, so read from it
+            data['BME_TYPE'] = 'BME280' if self.bme.is_bme280 else 'BMP280'
+            try:
+                temp, press, hum = self.bme.values
+                data['TBMP'] = round(temp, 2)
+                data['PBMP'] = round(press, 2)
+                if hum is not None:
+                    data['HUM'] = round(hum, 2)
+            except Exception as e:
+                print(f"Error reading BME/BMP sensor: {e}")
+                # Provide default values on read error
+                data['TBMP'], data['PBMP'] = 0, 0
+        else:
+            # Sensor was not found during init, provide default values
+            data['BME_TYPE'] = 'N/A'
+            data['TBMP'] = 0
+            data['PBMP'] = 0
+            # 'HUM' will be absent, and the frontend will handle it
 
+        # Read other sensors as normal
         if self.ds_rom:
             self.ds_sensor.convert_temp()
             await asyncio.sleep_ms(750)
@@ -77,7 +97,15 @@ class SensorReader:
         else:
             data['TDS18'] = 0
 
-        data['KTYPE'] = self.k_type.read()
+        # Handle NaN from K-Type sensor
+        k_type_temp = self.k_type.read()
+        if k_type_temp is not None and math.isnan(k_type_temp):
+            # Use 0.0 instead of None to satisfy the NOT NULL database constraint
+            data['KTYPE'] = 0.0
+            print("Warning: K-Type sensor returned NaN (check wiring). Defaulting to 0.0.")
+        else:
+            data['KTYPE'] = k_type_temp
+
         return data
 
 # --- Main Application Tasks ---
@@ -85,20 +113,60 @@ async def data_collector_task(npbc, sensors):
     while True:
         print("Collecting data...")
         try:
-            burner_data = await npbc.get_general_information()
+            # Get the response object from the controller
+            burner_response_object = await npbc.get_general_information()
             sensor_data = await sensors.read_all()
 
+            # Convert the object to a dictionary if it's not None
+            burner_data = {}
+            if burner_response_object:
+                burner_data = burner_response_object.to_dict()
+
+            # Only proceed if we have valid data from the burner
+            if not burner_data:
+                print("Failed to get burner data, skipping post for this cycle.")
+                # Wait for the next cycle without posting
+                await asyncio.sleep(30)
+                continue
+
+            # Get the offset from config, defaulting to 0 if not found
+            offset_hours = getattr(config, 'TIMEZONE_OFFSET', 0)
+            local_timestamp = time.time() + (offset_hours * 3600)
+            local_time_tuple = time.localtime(local_timestamp)
+
+            # Update global state with the new dictionary
             app_state['burner'] = burner_data
             app_state['sensors'] = sensor_data
-            app_state['last_update'] = f"{time.localtime()[3]:02d}:{time.localtime()[4]:02d}:{time.localtime()[5]:02d}"
+            app_state['last_update'] = f"{local_time_tuple[3]:02d}:{local_time_tuple[4]:02d}:{local_time_tuple[5]:02d}"
 
+            # The rest of the logic now works with the 'burner_data' dictionary
             full_data = burner_data.copy()
             full_data.update(sensor_data)
+
             try:
-                requests.post(config.REMOTE_POST_URL, json=full_data, headers = {'content-type': 'application/json'})
-                print("Data posted successfully.")
+                # 1. Add the debug print you requested
+                print("--- Sending Data to Server ---")
+                print(full_data)
+
+                # 2. Make the request and get the response object
+                response = requests.post(
+                    config.REMOTE_POST_URL,
+                    json=full_data,
+                    headers={'content-type': 'application/json'}
+                )
+
+                # 3. Check the server's response status code
+                if response.status_code == 200:
+                    print("Data posted successfully (Server responded OK).")
+                else:
+                    print(f"Error: Server responded with status {response.status_code}")
+                    print(f"Response body: {response.text}")
+
+                response.close() # Always close the response
+
             except Exception as e:
-                print(f"Host unreachable: {e}")
+                print(f"Host unreachable or request failed: {e}")
+
         except Exception as e:
             print(f"Error in data collection: {e}")
 
@@ -169,7 +237,7 @@ async def scheduler_task(npbc, sensor_reader):
         # Wait 60 seconds before the next check
         await asyncio.sleep(60)
 
-# --- NEW ASYNC WRAPPER FOR BOOT-TIME UPDATE ---
+# --- ASYNC WRAPPER FOR BOOT-TIME UPDATE ---
 async def boot_time_update_check():
     """
     Waits for network to be ready, then checks for OTA updates.
@@ -236,7 +304,7 @@ async def save_schedule(request):
         return Response(json.dumps(updated), 200)
     else:
         new_sched = scheduler.add_schedule(data)
-        return Response(json.dumps(new_sched), 201) # 201 Created
+        return Response(json.dumps(new_sched), 201)
 
 @app.route('/api/schedules/<schedule_id>', methods=['DELETE'])
 async def delete_schedule(request, schedule_id):
@@ -263,6 +331,13 @@ async def api_update(request):
     except Exception as e:
         print(f"OTA update failed with exception: {e}")
         return Response({'status': 'error', 'message': str(e)}, 500)
+
+# --- REBOOT ENDPOINT ---
+@app.route('/api/reboot', methods=['POST'])
+async def api_reboot(request):
+    print("Reboot requested from web interface.")
+    # This will not return a response, the client will see a connection error
+    reset()
 
 # --- Main Execution ---
 npbc_controller = NPBCController(tx_pin=config.PIN_UART2_TX, rx_pin=config.PIN_UART2_RX)

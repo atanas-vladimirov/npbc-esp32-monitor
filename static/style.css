@@ -202,3 +202,19 @@ html.dark-mode body .schedule-info span { color: #aaa; }
 #modal-cancel {
     background-color: transparent; border: 1px solid var(--border-color); color: var(--text-color);
 }
+.btn-danger {
+    margin-top: 0.5rem;
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid #c0392b;
+    border-radius: 5px;
+    background-color: transparent;
+    color: #c0392b;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+.btn-danger:hover {
+    background-color: #c0392b;
+    color: #fff;
+}

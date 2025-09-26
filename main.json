@@ -4,10 +4,14 @@
     "main.py",
     "boot.py",
     "config.py",
-    "lib/npbc.py",
-    "lib/ota.py",
-    "drivers/bme280_driver.py",
-    "drivers/max6675.py",
+    "uftpd.mpy",
+    "lib/npbc.mpy",
+    "lib/ota.mpy",
+    "lib/scheduler.mpy",
+    "lib/microdot/__init__.mpy",
+    "lib/microdot/microdot.mpy",
+    "drivers/bme280_driver.mpy",
+    "drivers/max6675.mpy",
     "templates/index.html",
     "static/style.css"
   ]

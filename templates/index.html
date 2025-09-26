@@ -155,6 +155,7 @@
                         <div class="update-section">
                             <hr>
                             <button id="update-button">Check for Updates</button>
+                            <button id="reboot-button" class="btn-danger">Reboot ESP32</button>
                             <p id="update-status"></p>
                         </div>
                     </div>
@@ -210,6 +211,14 @@
 
         // --- DATA FETCHING AND UI UPDATING ---
         function updateUI(data) {
+            // --- FIX FOR UI RACE CONDITION ---
+            // Check if the data is still the initial placeholder data
+            if (data.burner && data.burner.status === 'Initializing...') {
+                // If so, schedule a quick retry in 1 second
+                console.log("Data not ready, retrying in 1s...");
+                setTimeout(fetchData, 1000);
+                return; // Stop processing this payload
+            }
             const burner = data.burner || {};
             const sensors = data.sensors || {};
             document.getElementById('last-update').textContent = `Last update: ${data.last_update || '...'}`;
@@ -308,6 +317,21 @@
                     updateButton.disabled = false;
                     updateStatus.textContent = '';
                 }, 5000);
+            }
+        });
+
+        // --- ADD REBOOT BUTTON LOGIC ---
+        const rebootButton = document.getElementById('reboot-button');
+        rebootButton.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to reboot the ESP32?')) {
+                try {
+                    updateStatus.textContent = 'Rebooting...';
+                    // We don't await this, as the server will die and not respond
+                    fetch('/api/reboot', { method: 'POST' });
+                } catch (error) {
+                    // This catch will likely not be reached
+                    console.error('Reboot call failed:', error);
+                }
             }
         });
 
