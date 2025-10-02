@@ -263,7 +263,7 @@ def format_burner_data(data):
     if not data or 'Mode' not in data: return data
     modes = {0: 'Standby', 1: 'Auto', 2: 'Timer'}
     states = {0: 'CH Priority', 1: 'DHW Priority', 2: 'Parallel Pumps', 3: 'Summer Mode'}
-    powers = {0: '', 1: '/ Suspend', 2: '/ Power 1', 3: '/ Power 2', 4: '/ Power 3'}
+    powers = {0: 'Off', 1: 'Suspend', 2: 'Power 1', 3: 'Power 2', 4: 'Power 3'}
     statuses = {0: 'Idle', 1: 'Fan Cleaning', 2: 'Cleaner', 3: 'Wait', 4: 'Loading', 5: 'Heating', 6: 'Ignition1', 7: 'Ignition2', 8: 'Unfolding', 9: 'Burning', 10: 'Extinction', 11: 'Standby/Extinct'}
     formatted = data.copy()
     formatted['Mode'] = modes.get(data.get('Mode'), 'Unknown')
