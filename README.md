@@ -3,6 +3,8 @@ NPBC ESP32 Monitor & Controller
 
 Forum thread - https://forum.napravisam.bg/viewtopic.php?f=10&t=56132 (in Bulgarian)
 
+Serial communication - https://docs.google.com/document/d/1KcVzQBtTQ5pMynbCa0GaeEXAGIgiVw619StGtw9ZOT4/
+
 A comprehensive, modern monitoring and control system for pellet burners, built on MicroPython for the ESP32 platform. This project, developed in September 2025, provides a responsive web interface, remote updates, and robust sensor integration.
 
 Key Features
