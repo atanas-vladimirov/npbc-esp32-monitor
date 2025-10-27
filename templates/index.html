@@ -87,7 +87,10 @@
         <header>
             <h1>ESP32 Pellet Burner Monitor</h1>
             <div class="header-right">
-                <span id="last-update">Last update: ...</span>
+                <div class="header-stats">
+                    <span id="uptime-display">Uptime: ...</span>
+                    <span id="last-update">Last update: ...</span>
+                </div>
                 <button id="theme-toggle">🌙</button>
             </div>
         </header>
@@ -222,6 +225,7 @@
             const burner = data.burner || {};
             const sensors = data.sensors || {};
             document.getElementById('last-update').textContent = `Last update: ${data.last_update || '...'}`;
+            document.getElementById('uptime-display').textContent = `Uptime: ${data.uptime || '...'}`;
 
             // --- Burner Status Card ---
             document.getElementById('burner-mode').textContent = burner.Mode || 'N/A';

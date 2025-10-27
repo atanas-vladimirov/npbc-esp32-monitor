@@ -22,6 +22,9 @@ import onewire
 import ds18x20
 import math
 
+# --- Capture Boot Time ---
+boot_time = time.time()
+
 # --- State Management ---
 app_state = {
     'burner': {'status': 'Initializing...'},
@@ -276,6 +279,27 @@ async def ntp_sync_task():
 app = Microdot()
 Response.default_content_type = 'text/html'
 
+def format_uptime(seconds):
+    """Converts a duration in seconds to a 'Xd, HH:MM:SS' string."""
+    try:
+        days = seconds // 86400
+        seconds %= 86400
+        hours = seconds // 3600
+        seconds %= 3600
+        minutes = seconds // 60
+        seconds %= 60
+
+        # Ensure values are integers for formatting
+        days, hours, minutes, seconds = int(days), int(hours), int(minutes), int(seconds)
+
+        if days > 0:
+            return f"{days}d, {hours:02d}:{minutes:02d}:{seconds:02d}"
+        else:
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    except Exception as e:
+        print(f"Error formatting uptime: {e}")
+        return "..."
+
 def format_burner_data(data):
     if not data or 'Mode' not in data: return data
     modes = {0: 'Standby', 1: 'Auto', 2: 'Timer'}
@@ -301,10 +325,14 @@ def static(request, path):
 
 @app.route('/api/data')
 async def api_data(request):
+    # Calculate current uptime
+    current_uptime_seconds = time.time() - boot_time
+
     full_state = {
         'burner': format_burner_data(app_state.get('burner', {})),
         'sensors': app_state.get('sensors', {}),
-        'last_update': app_state.get('last_update')
+        'last_update': app_state.get('last_update'),
+        'uptime': format_uptime(current_uptime_seconds)
     }
     return Response(json.dumps(full_state), headers={'Content-Type': 'application/json'})
 
