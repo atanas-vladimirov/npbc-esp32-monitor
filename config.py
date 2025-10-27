@@ -3,6 +3,15 @@
 # NTP Server
 NTP_HOST = 'bg.pool.ntp.org'
 
+# Interval in seconds to re-sync the time.
+# 3600 seconds = 1 hour
+NTP_SYNC_INTERVAL = 3600
+
+# --- Timezone Configuration ---
+# Set your local timezone offset from UTC in hours.
+# For Bulgaria (EEST) this is +3. For winter time (EET) it would be +2.
+TIMEZONE_OFFSET = 2
+
 # Remote Data-logging Server
 REMOTE_POST_URL = 'http://172.16.1.1:8088/api/logData'
 
@@ -10,11 +19,6 @@ REMOTE_POST_URL = 'http://172.16.1.1:8088/api/logData'
 # To use, uncomment the line below and fill in your network details.
 # STATIC_IP = ('192.168.1.100', '255.255.255.0', '192.168.1.1', '8.8.8.8')
 STATIC_IP = None
-
-# --- Timezone Configuration ---
-# Set your local timezone offset from UTC in hours.
-# For Bulgaria (EEST) this is +3. For winter time (EET) it would be +2.
-TIMEZONE_OFFSET = 3
 
 # --- OTA Update Configuration ---
 # URL to your public GitHub repository

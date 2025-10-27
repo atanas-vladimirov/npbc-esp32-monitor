@@ -6,6 +6,7 @@ import urequests as requests
 from machine import Pin, SPI, reset
 import network
 import time
+import ntptime
 
 # Web framework
 from microdot import Microdot, Response, send_file
@@ -255,6 +256,22 @@ async def boot_time_update_check():
     except Exception as e:
         print(f"Boot-time update check failed: {e}")
 
+# --- NTP SYNC TASK ---
+async def ntp_sync_task():
+    """Periodically re-syncs the system time with an NTP server."""
+    while True:
+        # Wait for the specified interval.
+        # We sleep *before* the sync, as boot.py already did the first one.
+        await asyncio.sleep(config.NTP_SYNC_INTERVAL)
+
+        try:
+            print("Performing periodic NTP time sync...")
+            ntptime.host = config.NTP_HOST
+            ntptime.settime()
+            print("Time re-synchronized successfully.")
+        except Exception as e:
+            print(f"Periodic NTP sync failed: {e}")
+
 # --- Web Server Setup ---
 app = Microdot()
 Response.default_content_type = 'text/html'
@@ -355,6 +372,9 @@ async def main():
 
     print("Starting scheduler task...")
     asyncio.create_task(scheduler_task(npbc_controller, sensor_reader))
+
+    print("Starting NTP sync task...")
+    asyncio.create_task(ntp_sync_task())
 
     ip_addr = network.WLAN(network.STA_IF).ifconfig()[0]
     print(f'Starting web server on http://{ip_addr}')
