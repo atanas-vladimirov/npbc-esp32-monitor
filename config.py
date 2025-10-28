@@ -8,9 +8,8 @@ NTP_HOST = 'bg.pool.ntp.org'
 NTP_SYNC_INTERVAL = 3600
 
 # --- Timezone Configuration ---
-# Set your local timezone offset from UTC in hours.
-# For Bulgaria (EEST) this is +3. For winter time (EET) it would be +2.
-TIMEZONE_OFFSET = 2
+# Set your local timezone name from http://worldtimeapi.org/api/timezone
+TIMEZONE = "Europe/Sofia"
 
 # Remote Data-logging Server
 REMOTE_POST_URL = 'http://172.16.1.1:8088/api/logData'

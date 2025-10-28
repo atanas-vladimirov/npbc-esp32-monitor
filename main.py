@@ -38,6 +38,11 @@ ota_updater = OTAUpdater(config.GITHUB_REPO, main_dir='.')
 # --- Scheduler Instance ---
 scheduler = Scheduler()
 
+# --- Store the offset in the app_state ---
+# We initialize it with a 'best guess' in case the first API call fails
+# 2 hours * 3600 seconds = 7200 (for Bulgaria)
+app_state['utc_offset_seconds'] = 7200
+
 # --- Sensor Reading Classes ---
 class SensorReader:
     def __init__(self):
@@ -133,9 +138,9 @@ async def data_collector_task(npbc, sensors):
                 await asyncio.sleep(30)
                 continue
 
-            # Get the offset from config, defaulting to 0 if not found
-            offset_hours = getattr(config, 'TIMEZONE_OFFSET', 0)
-            local_timestamp = time.time() + (offset_hours * 3600)
+            # Get the offset from our dynamically updated app_state
+            offset_sec = app_state.get('utc_offset_seconds', 0)
+            local_timestamp = time.time() + offset_sec
             local_time_tuple = time.localtime(local_timestamp)
 
             # Update global state with the new dictionary
@@ -260,20 +265,40 @@ async def boot_time_update_check():
         print(f"Boot-time update check failed: {e}")
 
 # --- NTP SYNC TASK ---
-async def ntp_sync_task():
-    """Periodically re-syncs the system time with an NTP server."""
+async def time_and_offset_sync_task():
+    """
+    Periodically re-syncs system time with NTP and fetches the
+    correct local timezone offset (including DST) from WorldTimeAPI.
+    """
     while True:
-        # Wait for the specified interval.
-        # We sleep *before* the sync, as boot.py already did the first one.
-        await asyncio.sleep(config.NTP_SYNC_INTERVAL)
-
         try:
+            # 1. Sync NTP time (UTC)
             print("Performing periodic NTP time sync...")
             ntptime.host = config.NTP_HOST
             ntptime.settime()
             print("Time re-synchronized successfully.")
+
+            # 2. Fetch correct timezone offset (including DST)
+            print(f"Fetching timezone offset for {config.TIMEZONE}...")
+            url = f"http://worldtimeapi.org/api/timezone/{config.TIMEZONE}"
+            response = requests.get(url, timeout=10)
+
+            if response.status_code == 200:
+                data = response.json()
+                # This API gives us the total offset in seconds (base + DST)
+                total_offset = data['raw_offset'] + data['dst_offset']
+                app_state['utc_offset_seconds'] = total_offset
+                print(f"Timezone offset updated to: {total_offset} seconds (UTC{data['utc_offset']})")
+            else:
+                print(f"Failed to fetch timezone offset, status: {response.status_code}")
+
+            response.close()
+
         except Exception as e:
-            print(f"Periodic NTP sync failed: {e}")
+            print(f"Periodic time/offset sync failed: {e}")
+
+        # Wait for the next sync interval
+        await asyncio.sleep(config.NTP_SYNC_INTERVAL)
 
 # --- Web Server Setup ---
 app = Microdot()
@@ -401,8 +426,8 @@ async def main():
     print("Starting scheduler task...")
     asyncio.create_task(scheduler_task(npbc_controller, sensor_reader))
 
-    print("Starting NTP sync task...")
-    asyncio.create_task(ntp_sync_task())
+    print("Starting NTP/Timezone offset sync task...")
+    asyncio.create_task(time_and_offset_sync_task())
 
     ip_addr = network.WLAN(network.STA_IF).ifconfig()[0]
     print(f'Starting web server on http://{ip_addr}')
