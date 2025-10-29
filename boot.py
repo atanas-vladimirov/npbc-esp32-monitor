@@ -37,22 +37,22 @@ def connect_wifi():
         print('Connecting to network...')
         sta_if.active(True)
         sta_if.config(pm=sta_if.PM_NONE) # disable power management
-        
+
         if config.STATIC_IP:
             sta_if.ifconfig(config.STATIC_IP)
-            
+
         sta_if.connect(secrets.WIFI_SSID, secrets.WIFI_PASS)
-        
+
         timeout = 15
         while not sta_if.isconnected() and timeout > 0:
             print('.', end='')
             time.sleep(1)
             timeout -= 1
-        
+
     if sta_if.isconnected():
         print('\nNetwork connected!')
         print('IP Address:', sta_if.ifconfig()[0])
-        
+
         ntptime.host = config.NTP_HOST
         try:
             ntptime.settime()

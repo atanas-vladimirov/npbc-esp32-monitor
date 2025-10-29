@@ -8,8 +8,9 @@ NTP_HOST = 'bg.pool.ntp.org'
 NTP_SYNC_INTERVAL = 3600
 
 # --- Timezone Configuration ---
-# Set your local timezone name from http://worldtimeapi.org/api/timezone
-TIMEZONE = "Europe/Sofia"
+# A POSIX string for your timezone. This automatically handles DST.
+# EET-2EEST = Eastern European Time (UTC+2), Daylight Saving is EEST (UTC+3)
+TIMEZONE_POSIX = "EET-2EEST,M3.5.0/3,M10.5.0/4"
 
 # Remote Data-logging Server
 REMOTE_POST_URL = 'http://172.16.1.1:8088/api/logData'
