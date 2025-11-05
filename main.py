@@ -204,37 +204,50 @@ async def scheduler_task(npbc, sensor_reader):
                     continue
 
                 # --- Check for ON time ---
-                on_hour, on_minute = map(int, sched['on_time'].split(':'))
-                if on_hour == current_hour and on_minute == current_minute:
-                    print(f"Scheduler: Matched ON time for '{sched['name']}'")
+                # sched.get('on_time') will return the time string or None
+                on_time_str = sched.get('on_time')
+                if on_time_str: # Process if not None or empty string
+                    try:
+                        on_hour, on_minute = map(int, on_time_str.split(':'))
+                        if on_hour == current_hour and on_minute == current_minute:
+                            print(f"Scheduler: Matched ON time for '{sched['name']}'")
 
-                    # Check temperature condition
-                    temp_ok = False
-                    condition = sched.get('temp_condition', 'none')
-                    threshold = sched.get('temp_threshold', 0)
+                            # Check temperature condition
+                            temp_ok = False
+                            condition = sched.get('temp_condition', 'none')
+                            threshold = sched.get('temp_threshold', 0)
 
-                    if condition == 'none':
-                        temp_ok = True
-                    elif condition == 'below' and current_temp < threshold:
-                        temp_ok = True
-                        print(f"Temp condition met: {current_temp}°C is below {threshold}°C")
-                    elif condition == 'above' and current_temp > threshold:
-                        temp_ok = True
-                        print(f"Temp condition met: {current_temp}°C is above {threshold}°C")
+                            if condition == 'none':
+                                temp_ok = True
+                            elif condition == 'below' and current_temp < threshold:
+                                temp_ok = True
+                                print(f"Temp condition met: {current_temp}°C is below {threshold}°C")
+                            elif condition == 'above' and current_temp > threshold:
+                                temp_ok = True
+                                print(f"Temp condition met: {current_temp}°C is above {threshold}°C")
 
-                    if temp_ok:
-                        print(f"Executing ON action for '{sched['name']}'")
-                        # Set Mode to Auto (1) with the specified priority
-                        await npbc.set_mode_and_priority(1, sched['priority_on'])
-                    else:
-                        print(f"Temp condition NOT met for '{sched['name']}'. Skipping.")
+                            if temp_ok:
+                                print(f"Executing ON action for '{sched['name']}'")
+                                # Set Mode to Auto (1) with the specified priority
+                                await npbc.set_mode_and_priority(1, sched['priority_on'])
+                            else:
+                                print(f"Temp condition NOT met for '{sched['name']}'. Skipping.")
+                    except ValueError:
+                        print(f"Scheduler: Skipping invalid ON time '{on_time_str}'")
+
 
                 # --- Check for OFF time ---
-                off_hour, off_minute = map(int, sched['off_time'].split(':'))
-                if off_hour == current_hour and off_minute == current_minute:
-                    print(f"Scheduler: Matched OFF time for '{sched['name']}'. Executing OFF action.")
-                    # Set Mode to Standby (0)
-                    await npbc.set_mode_and_priority(0, 0)
+                off_time_str = sched.get('off_time')
+                if off_time_str: # Process if not None or empty string
+                    try:
+                        off_hour, off_minute = map(int, off_time_str.split(':'))
+
+                        if off_hour == current_hour and off_minute == current_minute:
+                            print(f"Scheduler: Matched OFF time for '{sched['name']}'. Executing OFF action.")
+                            # --- MODIFIED: Always set to Standby (Mode 0) ---
+                            await npbc.set_mode_and_priority(0, 0)
+                    except ValueError:
+                        print(f"Scheduler: Skipping invalid OFF time '{off_time_str}'")
 
         except Exception as e:
             print(f"Error in scheduler task: {e}")
@@ -276,6 +289,8 @@ async def ntp_sync_task():
 # --- Web Server Setup ---
 app = Microdot()
 Response.default_content_type = 'text/html'
+# Make sure controller is globally accessible for the web route
+npbc_controller = None
 
 def format_uptime(seconds):
     """Converts a duration in seconds to a 'Xd, HH:MM:SS' string."""
@@ -358,11 +373,37 @@ async def delete_schedule(request, schedule_id):
 
 @app.route('/api/settings', methods=['POST'])
 async def api_settings(request):
+    global npbc_controller # Use the global controller instance
     data = request.json
     mode, priority = data.get('mode'), data.get('priority')
+
     if mode is not None and priority is not None:
+        # 1. Set the new mode and priority
         success = await npbc_controller.set_mode_and_priority(int(mode), int(priority))
-        return Response({'status': 'ok' if success else 'failed'}, 200 if success else 500)
+
+        if not success:
+            return Response({'status': 'failed to set'}, 500)
+
+        # 2. Give the burner a moment to process the command
+        await asyncio.sleep_ms(250)
+
+        # 3. Read the NEW state directly from the burner
+        try:
+            new_burner_data_obj = await npbc_controller.get_general_information()
+            if new_burner_data_obj:
+                # 4. Format and return the new state
+                new_burner_data_dict = new_burner_data_obj.to_dict()
+                # Update the global state cache as well
+                app_state['burner'] = new_burner_data_dict
+                formatted_data = format_burner_data(new_burner_data_dict)
+                # This response is now the full, updated burner state
+                return Response(json.dumps(formatted_data), 200)
+            else:
+                return Response({'status': 'failed to read back state'}, 500)
+        except Exception as e:
+            print(f"Error reading back state in /api/settings: {e}")
+            return Response({'status': 'error readback'}, 500)
+
     return Response({'status': 'bad request'}, 400)
 
 @app.route('/api/update', methods=['POST'])
@@ -383,12 +424,16 @@ async def api_reboot(request):
     reset()
 
 # --- Main Execution ---
-npbc_controller = NPBCController(tx_pin=config.PIN_UART2_TX, rx_pin=config.PIN_UART2_RX)
-sensor_reader = SensorReader()
+sensor_reader = SensorReader() # Init sensors first
 
 async def main():
+    global npbc_controller # We need to assign the global instance
+
     # Load schedules from flash memory at startup
     scheduler.load_schedules()
+
+    # Init the controller
+    npbc_controller = NPBCController(tx_pin=config.PIN_UART2_TX, rx_pin=config.PIN_UART2_RX)
 
     #print("Checking for updates on boot...")
     #asyncio.create_task(boot_time_update_check())

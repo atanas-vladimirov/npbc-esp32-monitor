@@ -31,12 +31,12 @@
                 </div>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label for="schedule-on-time">ON Time</label>
-                        <input type="time" id="schedule-on-time" required>
+                        <label for="schedule-on-time">ON Time (Optional)</label>
+                        <input type="time" id="schedule-on-time">
                     </div>
                     <div class="form-group">
-                        <label for="schedule-off-time">OFF Time</label>
-                        <input type="time" id="schedule-off-time" required>
+                        <label for="schedule-off-time">OFF Time (Optional)</label>
+                        <input type="time" id="schedule-off-time">
                     </div>
                 </div>
                 <div class="form-group">
@@ -212,12 +212,33 @@
             evt.currentTarget.className += " active";
         }
 
+        // --- HELPER FUNCTION for Controls Fix ---
+        // Updates the control dropdowns based on text values
+        function updateControlsDropdowns(modeStr, stateStr) {
+            // Maps to convert text status back to numeric value
+            const modeMap = { 'Standby': 0, 'Auto': 1, 'Timer': 2 };
+            const priorityMap = { 'CH Priority': 0, 'DHW Priority': 1, 'Parallel Pumps': 2, 'Summer Mode': 3 };
+
+            const modeSelect = document.getElementById('mode-select');
+            const prioritySelect = document.getElementById('priority-select');
+
+            // Find the numeric value corresponding to the current text status
+            const modeValue = modeMap[modeStr];
+            const priorityValue = priorityMap[stateStr];
+
+            // Set dropdowns if a valid value is found
+            if (modeValue !== undefined) {
+                modeSelect.value = modeValue;
+            }
+            if (priorityValue !== undefined) {
+                prioritySelect.value = priorityValue;
+            }
+        }
+
         // --- DATA FETCHING AND UI UPDATING ---
         function updateUI(data) {
             // --- FIX FOR UI RACE CONDITION ---
-            // Check if the data is still the initial placeholder data
             if (data.burner && data.burner.status === 'Initializing...') {
-                // If so, schedule a quick retry in 1 second
                 console.log("Data not ready, retrying in 1s...");
                 setTimeout(fetchData, 1000);
                 return; // Stop processing this payload
@@ -232,7 +253,6 @@
             document.getElementById('burner-state').textContent = burner.State || 'N/A';
             document.getElementById('burner-status').textContent = burner.Status || 'N/A';
             document.getElementById('burner-power').textContent = burner.Power || 'N/A';
-            // Add "lx" unit to flame strength
             document.getElementById('burner-flame').textContent = (burner.Flame !== undefined ? burner.Flame + ' lx' : 'N/A lx');
 
             // --- Temperatures Card ---
@@ -241,7 +261,6 @@
             document.getElementById('temp-dhw').textContent = burner.DHW || 'N/A';
             document.getElementById('temp-tds18').textContent = sensors.TDS18 || 'N/A';
             document.getElementById('temp-ktype').textContent = sensors.KTYPE || 'N/A';
-            // Set dynamic sensor name
             document.getElementById('ambient-sensor-type').textContent = sensors.BME_TYPE || 'Sensor';
             document.getElementById('temp-tbmp').textContent = sensors.TBMP || 'N/A';
             document.getElementById('pressure-pbmp').textContent = sensors.PBMP || 'N/A';
@@ -260,6 +279,11 @@
             } else {
                 humidityRow.style.display = 'none'; // Hide the row
             }
+
+            // --- Controls Card Dropdowns (called on data refresh) ---
+            if (burner.Mode && burner.State) {
+                updateControlsDropdowns(burner.Mode, burner.State);
+            }
         }
         async function fetchData() {
             try {
@@ -272,16 +296,15 @@
             }
         }
 
-        // --- SETTINGS FORM LOGIC ---
+        // --- SETTINGS FORM LOGIC (Controls Fix) ---
         const settingsForm = document.getElementById('settings-form');
         const formStatus = document.getElementById('form-status');
         settingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             formStatus.textContent = 'Sending...';
-            const formData = new FormData(settingsForm);
             const data = {
-                mode: parseInt(formData.get('mode'), 10),
-                priority: parseInt(formData.get('priority'), 10)
+                mode: parseInt(document.getElementById('mode-select').value, 10),
+                priority: parseInt(document.getElementById('priority-select').value, 10)
             };
             try {
                 const response = await fetch('/api/settings', {
@@ -289,9 +312,23 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                if (response.ok) {
+                if (!response.ok) {
+                    throw new Error(`Failed to update settings (status: ${response.status})`);
+                }
+
+                // Response is the new burner state JSON
+                const newBurnerState = await response.json();
+
+                // --- IMMEDIATE DROPDOWN FIX ---
+                if (newBurnerState.Mode && newBurnerState.State) {
+                    // Update dropdowns with the *actual* state from the burner
+                    updateControlsDropdowns(newBurnerState.Mode, newBurnerState.State);
                     formStatus.textContent = 'Settings updated!';
-                } else { throw new Error('Failed to update settings'); }
+                } else {
+                    formStatus.textContent = 'Updated, but failed to read back state.';
+                }
+                // --- END OF FIX ---
+
             } catch (error) {
                 console.error(error);
                 formStatus.textContent = 'Error sending settings.';
@@ -360,12 +397,17 @@
                 if(sched.temp_condition !== 'none') {
                     tempRule = `If Temp ${sched.temp_condition === 'below' ? '&lt;' : '&gt;'} ${sched.temp_threshold}°C`;
                 }
+
+                // MODIFIED: Handle empty times for display
+                const onTimeDisplay = sched.on_time ? sched.on_time : '--:--';
+                const offTimeDisplay = sched.off_time ? sched.off_time : '--:--';
+
                 const schedDiv = document.createElement('div');
                 schedDiv.className = 'schedule-item' + (sched.enabled ? '' : ' disabled');
                 schedDiv.innerHTML = `
                     <div class="schedule-info">
                         <strong>${sched.name}</strong>
-                        <span>ON: ${sched.on_time}, OFF: ${sched.off_time}</span>
+                        <span>ON: ${onTimeDisplay}, OFF: ${offTimeDisplay}</span>
                         <span class="schedule-days">${activeDays}</span>
                         <span class="schedule-temp">${tempRule}</span>
                     </div>
@@ -391,8 +433,9 @@
                 document.getElementById('modal-title').textContent = 'Edit Schedule';
                 document.getElementById('schedule-id').value = schedule.id;
                 document.getElementById('schedule-name').value = schedule.name;
-                document.getElementById('schedule-on-time').value = schedule.on_time;
-                document.getElementById('schedule-off-time').value = schedule.off_time;
+                // MODIFIED: Set to empty string if null/undefined
+                document.getElementById('schedule-on-time').value = schedule.on_time || '';
+                document.getElementById('schedule-off-time').value = schedule.off_time || '';
                 document.getElementById('schedule-enabled').checked = schedule.enabled;
                 document.getElementById('schedule-priority-on').value = schedule.priority_on;
                 schedule.days.forEach((day, i) => { document.getElementById(`day-${i}`).checked = day; });
@@ -418,16 +461,27 @@
         });
         scheduleForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            // MODIFIED: Validation for schedule times
+            const onTime = document.getElementById('schedule-on-time').value;
+            const offTime = document.getElementById('schedule-off-time').value;
+
+            if (!onTime && !offTime) {
+                alert('Please enter at least an ON time or an OFF time.');
+                return; // Stop submission
+            }
+
             const days = Array.from({length: 7}, (_, i) => document.getElementById(`day-${i}`).checked);
             const scheduleData = {
                 id: document.getElementById('schedule-id').value ? parseInt(document.getElementById('schedule-id').value) : null,
                 name: document.getElementById('schedule-name').value,
-                on_time: document.getElementById('schedule-on-time').value,
-                off_time: document.getElementById('schedule-off-time').value,
+                on_time: onTime, // Send empty string "" if not set
+                off_time: offTime, // Send empty string "" if not set
                 days: days,
                 temp_condition: document.getElementById('schedule-temp-condition').value,
                 temp_threshold: parseFloat(document.getElementById('schedule-temp-threshold').value) || 0,
                 priority_on: parseInt(document.getElementById('schedule-priority-on').value),
+                // "mode_off" is removed
                 enabled: document.getElementById('schedule-enabled').checked
             };
             try {
