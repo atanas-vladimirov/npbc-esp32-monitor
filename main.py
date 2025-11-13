@@ -188,10 +188,10 @@ async def scheduler_task(npbc, sensor_reader):
             current_time = localPTZtime.tztime(utc_now, config.TIMEZONE_POSIX)
             current_hour = current_time[3]
             current_minute = current_time[4]
-            # tm_wday: Monday is 0 and Sunday is 6
-            current_day_of_week = current_time[6]
+            current_day_of_week = current_time[6] # Monday is 0, Sunday is 6
 
-            current_temp = app_state.get('sensors', {}).get('TBMP', 999)
+            # Get current temp, default to a safe value if sensor fails
+            current_temp = app_state.get('sensors', {}).get('TBMP', 0)
 
             schedules = scheduler.get_schedules()
 
@@ -203,56 +203,57 @@ async def scheduler_task(npbc, sensor_reader):
                 if not sched['days'][current_day_of_week]:
                     continue
 
+                # We determine if the temp condition is met first
+                condition = sched.get('temp_condition', 'none')
+                threshold = sched.get('temp_threshold', 0)
+                temp_ok = False
+
+                if condition == 'none':
+                    temp_ok = True
+                elif condition == 'below' and current_temp < threshold:
+                    temp_ok = True
+                elif condition == 'above' and current_temp > threshold:
+                    temp_ok = True
+
+                # Debug print if needed
+                # if not temp_ok and condition != 'none':
+                #     print(f"Scheduler: Condition '{condition} {threshold}' not met. Current: {current_temp}")
+
                 # --- Check for ON time ---
-                # sched.get('on_time') will return the time string or None
                 on_time_str = sched.get('on_time')
-                if on_time_str: # Process if not None or empty string
+                if on_time_str:
                     try:
                         on_hour, on_minute = map(int, on_time_str.split(':'))
                         if on_hour == current_hour and on_minute == current_minute:
                             print(f"Scheduler: Matched ON time for '{sched['name']}'")
 
-                            # Check temperature condition
-                            temp_ok = False
-                            condition = sched.get('temp_condition', 'none')
-                            threshold = sched.get('temp_threshold', 0)
-
-                            if condition == 'none':
-                                temp_ok = True
-                            elif condition == 'below' and current_temp < threshold:
-                                temp_ok = True
-                                print(f"Temp condition met: {current_temp}°C is below {threshold}°C")
-                            elif condition == 'above' and current_temp > threshold:
-                                temp_ok = True
-                                print(f"Temp condition met: {current_temp}°C is above {threshold}°C")
-
                             if temp_ok:
                                 print(f"Executing ON action for '{sched['name']}'")
-                                # Set Mode to Auto (1) with the specified priority
                                 await npbc.set_mode_and_priority(1, sched['priority_on'])
                             else:
-                                print(f"Temp condition NOT met for '{sched['name']}'. Skipping.")
+                                print(f"Temp condition NOT met for '{sched['name']}' ON action. Skipping.")
                     except ValueError:
-                        print(f"Scheduler: Skipping invalid ON time '{on_time_str}'")
-
+                        pass
 
                 # --- Check for OFF time ---
                 off_time_str = sched.get('off_time')
-                if off_time_str: # Process if not None or empty string
+                if off_time_str:
                     try:
                         off_hour, off_minute = map(int, off_time_str.split(':'))
-
                         if off_hour == current_hour and off_minute == current_minute:
-                            print(f"Scheduler: Matched OFF time for '{sched['name']}'. Executing OFF action.")
-                            # --- MODIFIED: Always set to Standby (Mode 0) ---
-                            await npbc.set_mode_and_priority(0, 0)
+                            print(f"Scheduler: Matched OFF time for '{sched['name']}'")
+
+                            if temp_ok:
+                                print(f"Executing OFF action for '{sched['name']}'")
+                                await npbc.set_mode_and_priority(0, 0)
+                            else:
+                                print(f"Temp condition NOT met for '{sched['name']}' OFF action. Skipping.")
                     except ValueError:
-                        print(f"Scheduler: Skipping invalid OFF time '{off_time_str}'")
+                        pass
 
         except Exception as e:
             print(f"Error in scheduler task: {e}")
 
-        # Wait 60 seconds before the next check
         await asyncio.sleep(60)
 
 # --- ASYNC WRAPPER FOR BOOT-TIME UPDATE ---
