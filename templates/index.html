@@ -213,14 +213,21 @@
         }
 
         // --- HELPER FUNCTION for Controls Fix ---
+        // Track if user has unsaved changes in the controls dropdowns
+        let controlsModified = false;
+
         // Updates the control dropdowns based on text values
         function updateControlsDropdowns(modeStr, stateStr) {
+            // Don't overwrite user's pending changes
+            if (controlsModified) {
+                return;
+            }
             // Maps to convert text status back to numeric value
             const modeMap = { 'Standby': 0, 'Auto': 1, 'Timer': 2 };
             const priorityMap = { 'CH Priority': 0, 'DHW Priority': 1, 'Parallel Pumps': 2, 'Summer Mode': 3 };
 
-            const modeSelect = document.getElementById('mode-select');
-            const prioritySelect = document.getElementById('priority-select');
+            const modeSelectEl = document.getElementById('mode-select');
+            const prioritySelectEl = document.getElementById('priority-select');
 
             // Find the numeric value corresponding to the current text status
             const modeValue = modeMap[modeStr];
@@ -228,10 +235,10 @@
 
             // Set dropdowns if a valid value is found
             if (modeValue !== undefined) {
-                modeSelect.value = modeValue;
+                modeSelectEl.value = modeValue;
             }
             if (priorityValue !== undefined) {
-                prioritySelect.value = priorityValue;
+                prioritySelectEl.value = priorityValue;
             }
         }
 
@@ -299,6 +306,13 @@
         // --- SETTINGS FORM LOGIC (Controls Fix) ---
         const settingsForm = document.getElementById('settings-form');
         const formStatus = document.getElementById('form-status');
+        const modeSelect = document.getElementById('mode-select');
+        const prioritySelect = document.getElementById('priority-select');
+
+        // Mark controls as modified when user changes the dropdowns
+        modeSelect.addEventListener('change', () => { controlsModified = true; });
+        prioritySelect.addEventListener('change', () => { controlsModified = true; });
+
         settingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             formStatus.textContent = 'Sending...';
@@ -320,6 +334,8 @@
                 const newBurnerState = await response.json();
 
                 // --- IMMEDIATE DROPDOWN FIX ---
+                // Reset the modified flag so dropdowns can be updated
+                controlsModified = false;
                 if (newBurnerState.Mode && newBurnerState.State) {
                     // Update dropdowns with the *actual* state from the burner
                     updateControlsDropdowns(newBurnerState.Mode, newBurnerState.State);
