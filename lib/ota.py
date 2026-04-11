@@ -22,7 +22,8 @@ class OTAUpdater:
         if len(self.github_repo.split('/')) != 2:
             raise ValueError("Invalid GitHub repository URL format. Expected 'user/repo'.")
         self._main_dir = main_dir
-        self._module = module.rstrip('/')
+        self._module = module.strip('/')
+        self._raw_base = f'https://raw.githubusercontent.com/{self.github_repo}'
         try:
             with open(self._main_dir + '/main.json', 'r') as f:
                 self.current_version = ujson.load(f)['version']
@@ -30,6 +31,14 @@ class OTAUpdater:
         except (OSError, ValueError, KeyError):
             print("No valid version file found. Setting version to 0.")
             self.current_version = "0"
+
+    def _raw_url(self, version, path):
+        """Build a raw.githubusercontent.com URL, avoiding double slashes."""
+        parts = [self._raw_base, version]
+        if self._module:
+            parts.append(self._module)
+        parts.append(path)
+        return '/'.join(parts)
 
     def _request_json(self, url):
         """Perform a robust GET request expecting a JSON response, with retries for busy network."""
@@ -48,16 +57,16 @@ class OTAUpdater:
                     print("Error: Invalid JSON response.")
                     return None, "Invalid JSON response"
             except OSError as e:
-                # --- NEW RETRY LOGIC IS HERE ---
-                # Check if the error is EBUSY (error code 16)
-                if e.args[0] == 16: # uerrno.EBUSY
+                if e.args[0] == 16:  # uerrno.EBUSY
                     print(f"Network busy, retrying in 2 seconds... (Attempt {attempt + 1}/{self._MAX_RETRIES})")
                     time.sleep(2)
-                    continue # Go to the next attempt in the loop
+                    continue
                 else:
-                    # For any other network error, fail immediately
                     print(f"Network error: {e}")
-                    return None, "Network error"
+                    return None, f"Network error: {e}"
+            except Exception as e:
+                print(f"Request error: {e}")
+                return None, f"Request error: {e}"
             finally:
                 if 'response' in locals() and response:
                     response.close()
@@ -79,7 +88,7 @@ class OTAUpdater:
     def _download_and_install(self, version, files):
         """Download and install all files for the given version."""
         for file in files:
-            url = f'https://raw.githubusercontent.com/{self.github_repo}/{version}/{self._module}/{file}'
+            url = self._raw_url(version, file)
             print(f'Downloading {file}')
 
             try:
@@ -103,8 +112,8 @@ class OTAUpdater:
                 response.close()
                 gc.collect()
 
-            except OSError as e:
-                print(f"Failed to download {file} due to network error: {e}")
+            except Exception as e:
+                print(f"Failed to download {file}: {e}")
                 return False
 
         try:
@@ -129,7 +138,7 @@ class OTAUpdater:
         if latest_version > self.current_version:
             print(f'Newer version available. Updating from {self.current_version} to {latest_version}')
 
-            url = f'https://raw.githubusercontent.com/{self.github_repo}/{latest_version}/{self._module}/main.json'
+            url = self._raw_url(latest_version, 'main.json')
             manifest_data, msg = self._request_json(url)
 
             if manifest_data is None:
