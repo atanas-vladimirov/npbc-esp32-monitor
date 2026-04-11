@@ -5,125 +5,124 @@ Forum thread - https://forum.napravisam.bg/viewtopic.php?f=10&t=56132 (in Bulgar
 
 Serial communication - https://docs.google.com/document/d/1KcVzQBtTQ5pMynbCa0GaeEXAGIgiVw619StGtw9ZOT4/
 
-A comprehensive, modern monitoring and control system for pellet burners, built on MicroPython for the ESP32 platform. This project, developed in September 2025, provides a responsive web interface, remote updates, and robust sensor integration.
+A comprehensive monitoring and control system for pellet burners, built on
+MicroPython for the ESP32 platform. It provides a responsive web interface,
+over-the-air updates, timestamped logging, and robust sensor integration.
+
 
 Key Features
 ------------
 
-* **Real-time Monitoring**: Live data from multiple sensors streamed directly to a web interface.
-* **Web-Based Control**: Responsive, mobile-friendly web UI to change burner settings.
-* **Remote Updates**: Secure Over-The-Air (OTA) update capability via GitHub to deploy new features and fixes.
-* **Multi-Sensor Integration**: Supports temperature (DS18X20, MAX6675), and pressure/temperature/humidity (BME280/BMP280) sensors.
-* **Secure Configuration**: A clear separation between public configuration (`config.py`) and private credentials (`secrets.py`).
-* **Robust Architecture**: Built on an asynchronous (`uasyncio`) foundation for non-blocking, concurrent operations.
-* **Remote Management**: Includes built-in FTP server and WebREPL for easy file management and debugging.
+* **Real-time Monitoring** — Live data from multiple sensors streamed to a web dashboard.
+* **Web-Based Control** — Responsive, mobile-friendly UI with dark mode support.
+* **ESP32 Device Card** — Displays WiFi RSSI, firmware version, uptime, free memory, and hosts the OTA update and reboot controls.
+* **Over-The-Air Updates** — Checks a GitHub repository for new releases, downloads updated files with automatic retry, and reboots.
+* **OTA-Safe Configuration** — Defaults ship in ``config_defaults.py`` (overwritten by OTA); user overrides live in ``config.py`` (never touched by OTA).
+* **Multi-Sensor Integration** — DS18X20 (OneWire), MAX6675 K-type thermocouple (SPI), BME280/BMP280 (SPI).
+* **Async Architecture** — Built on ``uasyncio`` for non-blocking, concurrent sensor reads, UART communication, and web serving.
+* **Remote Management** — Built-in async FTP server and WebREPL, both individually enable/disable via configuration.
+* **Timestamped Logging** — Every log line includes local date/time and free heap memory.
 
 
 Project Overview
 ================
 
-The goal of this project is to create an IoT device that interfaces directly with a pellet burner controller via UART. It collects real-time operational data such as boiler temperature, status, and pump activity.
+The device interfaces with a pellet burner controller via UART, collecting
+real-time operational data (boiler temperature, status, pump activity).
+It also reads environmental sensors:
 
-In addition, it integrates with a suite of environmental sensors:
+* **MAX6675 K-Type Thermocouple** — Exhaust gas temperature.
+* **BME280 / BMP280** — Ambient temperature, pressure, and humidity (BME280 only).
+* **DS18X20** — Return-water temperature in the heating system.
 
-* **MAX6675 K-Type Thermocouple**: To measure high temperatures, typically of exhaust gases.
-* **BME280/BMP280**: To measure ambient temperature, pressure, and (for the BME280) humidity.
-* **DS18X20**: To measure the temperature of the returning water in the heating system.
-
-All this data is consolidated and presented on a self-hosted web page, accessible from any device on the local network. Users can not only view the data but also send commands back to the burner to change its mode and priority.
-
-
-Implementation Details
-======================
-
-Core Architecture
------------------
-The application is built entirely in MicroPython and leverages the `uasyncio` library for its core processing loop. This allows for cooperative multitasking, where data collection from sensors, communication with the burner, and handling of web server requests all occur concurrently without blocking one another.
-
-Web Interface
--------------
-The web server is powered by **Microdot**, a lightweight and efficient `asyncio`-based web framework. It serves a modern, single-page application built with HTML, CSS, and vanilla JavaScript. Key features of the frontend include:
-
-* **Live Data**: The page automatically fetches fresh data from the ESP32 every 5 seconds.
-* **Responsive Design**: The user interface adapts seamlessly to both desktop and mobile screen sizes.
-* **Dark Mode**: A theme toggle allows for comfortable viewing in low-light conditions.
-
-Hardware Interfacing
---------------------
-* **Pellet Burner**: Communication is handled over a UART bus, using a custom-built protocol handler (`lib/npbc.py`) that abstracts the command and response logic.
-* **Sensors**: The BME280/BMP280 and MAX6675 sensors are interfaced using the more robust **SPI** protocol. The DS18X20 sensor uses the One-Wire protocol.
-
-Remote Management
------------------
-* **OTA Updates**: The `lib/ota.py` module enables remote application updates. It checks for new releases on a specified GitHub repository, downloads the updated files, and reboots the device.
-* **FTP & WebREPL**: The project includes a built-in FTP server (`uftpd.py`) and the standard WebREPL for easy, remote access to the device's filesystem and interactive prompt for debugging.
-
-Configuration
--------------
-A dual-file system is used to manage settings securely:
-* `config.py`: Contains non-sensitive application settings (pinouts, server URLs) and is safe to be included in the public repository and updated via OTA.
-* `secrets.py`: Contains private credentials (WiFi password, WebREPL password). This file is created locally on the device and is **excluded** from version control and OTA updates.
+All data is consolidated on a self-hosted web page accessible from any device
+on the local network. Users can view live data, change burner mode/priority,
+trigger OTA updates, and reboot the device.
 
 
-Modules & Libraries
-===================
-
-Core MicroPython Libraries
---------------------------
-The following libraries are required and are already included:
-
-* `microdot`: The core web framework.
-* `urequests`: Used for posting data to a remote server and by the OTA module.
-* `onewire`: The protocol library for the DS18X20 sensor.
-* `micropython-ds18x20`: The driver for the DS18X20 sensor.
-
-Custom Project Modules
-----------------------
-* `main.py`: The main application entry point; starts all tasks and the web server.
-* `boot.py`: Initializes the system on boot (WiFi, WebREPL, FTP).
-* `config.py` & `secrets.py`: Handle application configuration and credentials.
-* `lib/npbc.py`: The controller class for UART communication with the pellet burner.
-* `lib/ota.py`: Manages the Over-The-Air update process.
-* `drivers/bme280_driver.py`: A unified SPI/I2C driver for BME280 & BMP280 sensors.
-* `drivers/max6675.py`: The driver for the MAX6675 thermocouple amplifier.
-* `uftpd.py`: The FTP server library.
-
-
-Installation
-============
-
-Follow these steps to get the project running on your ESP32 board.
-
-1.  Hardware Setup
---------------------
-Connect your sensors and the pellet burner's UART interface to the ESP32. Verify that the pins you use match the assignments in the `config.py` file.
-
-2.  Flash MicroPython
----------------------
-Flash your ESP32 with a recent, stable version of the MicroPython firmware (v1.18 or newer recommended). You can find the firmware on the `MicroPython official website <https://micropython.org/download/ESP32_GENERIC/>`_.
-
-Use a tool like `esptool.py` to flash the firmware.
-
-3.  Upload Project Files
-------------------------
-Upload all the project files and directories to the root of your ESP32's filesystem. The final structure on the device should look like this:
+File Structure
+==============
 
 ::
 
     /
-    ├── uftpd.mpy
-    ├── boot.py
-    ├── main.py
-    ├── config.py
-    ├── secrets.py
+    ├── boot.py                 # WiFi, WebREPL, system init
+    ├── main.py                 # Application entry point
+    ├── config_defaults.py      # Default settings (overwritten by OTA)
+    ├── config.py               # User overrides (never touched by OTA)
+    ├── secrets.py              # WiFi & WebREPL credentials (not in repo)
+    ├── main.json               # Firmware version & OTA file manifest
+    ├── uftpd.py                # Async FTP server
+    ├── schedules.json          # Scheduler data (created at runtime)
     ├── lib/
+    │   ├── config_loader.py    # Merges config_defaults + config overrides
+    │   ├── npbc.py             # UART protocol handler for pellet burner
+    │   ├── ota.py              # OTA updater (GitHub releases)
+    │   ├── scheduler.py        # Schedule management
+    │   ├── log.py              # Timestamped logging
+    │   ├── localPTZtime.py     # POSIX timezone conversion
+    │   └── microdot/           # Microdot web framework
     ├── drivers/
+    │   ├── bme280_driver.py    # BME280/BMP280 SPI driver
+    │   └── max6675.py          # MAX6675 SPI driver
     ├── templates/
+    │   └── index.html          # Web dashboard
     └── static/
+        └── style.css           # Dashboard styles
 
-4.  Configure Credentials (Crucial Step)
-----------------------------------------
-On the ESP32, create a new file named `secrets.py` and add your private credentials. **Do not skip this step.**
+
+Configuration
+=============
+
+The project uses a three-file configuration model:
+
+config_defaults.py — Defaults (OTA-managed)
+--------------------------------------------
+
+Contains every configurable option with its default value. This file **is
+overwritten** during OTA updates, so new options are added automatically.
+Do not edit this file on the device.
+
+config.py — User Overrides (OTA-safe)
+--------------------------------------
+
+Contains only the settings you want to change from the defaults. This file
+is **never overwritten** by OTA. At boot, ``lib/config_loader.py`` merges
+both files: any value defined in ``config.py`` takes priority.
+
+Example ``config.py``:
+
+::
+
+    # config.py — User overrides (NOT overwritten by OTA updates).
+    # Only add settings here that differ from config_defaults.py.
+
+    # --- Pin Assignments ---
+    # MAX6675 K-Type thermocouple (SPI bus 1)
+    PIN_MAX6675_SCK = 47
+    PIN_MAX6675_MISO = 20
+    PIN_MAX6675_CS = 21
+
+    # BME/BMP280 pressure/temp sensor (SPI bus 2)
+    PIN_BME_SCK = 8
+    PIN_BME_MISO = 17
+    PIN_BME_MOSI = 18
+    PIN_BME_CS = 16
+
+    # OneWire DS18X20 temperature sensor
+    PIN_DS18X20 = 3
+
+    # UART2 for pellet burner communication
+    PIN_UART2_TX = 11
+    PIN_UART2_RX = 12
+
+secrets.py — Credentials (not in version control)
+--------------------------------------------------
+
+Must be created manually on the device. It is excluded from OTA updates
+and should **never** be committed to the repository.
+
+Example ``secrets.py``:
 
 ::
 
@@ -132,21 +131,153 @@ On the ESP32, create a new file named `secrets.py` and add your private credenti
     WIFI_PASS = 'your_wifi_password'
     WEBREPL_PASS = 'your_webrepl_password'
 
+Available Configuration Options
+-------------------------------
 
-5.  Configure the Application
------------------------------
-Review `config.py` and edit the `GITHUB_REPO` URL to point to your public GitHub repository for OTA updates. Adjust any pin assignments if your hardware setup is different.
+All options below are defined in ``config_defaults.py`` and can be
+overridden in ``config.py``:
 
-6.  Reboot & Verify
+=========================  ==========================================  ==============================
+Option                     Description                                 Default
+=========================  ==========================================  ==============================
+``NTP_HOST``               NTP server hostname                         ``'bg.pool.ntp.org'``
+``NTP_SYNC_INTERVAL``      Seconds between NTP re-syncs                ``3600``
+``TIMEZONE_POSIX``         POSIX TZ string for local time              ``'EET-2EEST,M3.5.0/3,M10.5.0/4'``
+``REMOTE_POST_URL``        URL for remote data logging (None=off)      ``None``
+``STATIC_IP``              Static IP tuple or None for DHCP             ``None``
+``ENABLE_WEBREPL``         Start WebREPL on boot                       ``True``
+``ENABLE_FTP``             Start FTP server on boot                    ``True``
+``GITHUB_REPO``            GitHub repo URL for OTA updates             (project repo URL)
+``PIN_MAX6675_SCK``        MAX6675 SPI clock pin                       ``47``
+``PIN_MAX6675_MISO``       MAX6675 SPI MISO pin                        ``20``
+``PIN_MAX6675_CS``         MAX6675 chip select pin                     ``21``
+``PIN_BME_SCK``            BME/BMP280 SPI clock pin                    ``8``
+``PIN_BME_MISO``           BME/BMP280 SPI MISO pin                     ``17``
+``PIN_BME_MOSI``           BME/BMP280 SPI MOSI pin                     ``18``
+``PIN_BME_CS``             BME/BMP280 chip select pin                  ``16``
+``PIN_DS18X20``            DS18X20 OneWire data pin                    ``3``
+``PIN_UART2_TX``           UART2 TX pin (to burner)                    ``11``
+``PIN_UART2_RX``           UART2 RX pin (from burner)                  ``12``
+=========================  ==========================================  ==============================
+
+
+Installation
+============
+
+1. Flash MicroPython
+--------------------
+
+Flash your ESP32 with MicroPython v1.24 or newer. Firmware images are
+available at https://micropython.org/download/ — pick the build that
+matches your board (e.g. ``ESP32_GENERIC_S3`` for ESP32-S3 with SPIRAM).
+
+::
+
+    esptool.py --chip esp32s3 erase_flash
+    esptool.py --chip esp32s3 write_flash -z 0 ESP32_GENERIC_S3-SPIRAM_OCT-*.bin
+
+2. Upload Project Files
+-----------------------
+
+Upload all project files to the root of the ESP32 filesystem using
+``mpremote``, Thonny, or any tool of your choice.
+
+3. Create ``secrets.py``
+------------------------
+
+On the device, create ``secrets.py`` with your credentials (see example above).
+**This is required** — without it the device cannot connect to WiFi.
+
+4. Customise ``config.py`` (optional)
+-------------------------------------
+
+If your pin assignments or preferences differ from the defaults in
+``config_defaults.py``, create or edit ``config.py`` with only the values
+you need to override.
+
+5. Reboot & Verify
 -------------------
-Reboot your ESP32. It should automatically connect to your WiFi network. Check the serial output in your terminal to see the IP address assigned to the device. You can now access the web interface by navigating to that IP address in your browser.
+
+Reboot the ESP32. It will connect to WiFi, sync time via NTP, and start
+the web server. Check serial output for the assigned IP address, then open
+it in a browser.
 
 
-Usage
-=====
+OTA Updates
+===========
 
-* **Web Interface**: Access the device's IP address in a web browser to view real-time data and access the controls.
-* **OTA Updates**: To update the device, push your code changes to your GitHub repository, then create a new "Release" with a version tag that matches the `version` field in your `main.json` file. The update can be triggered from the "Check for Updates" button on the web interface.
+The OTA system uses GitHub releases to distribute firmware updates.
+
+How It Works
+------------
+
+1. The device fetches the latest release tag from the GitHub API.
+2. If a newer version exists, it downloads ``main.json`` from that release
+   to get the list of files to update.
+3. Each file is downloaded (with up to 3 retries per file) and written to
+   the device filesystem.
+4. ``config.py`` and ``secrets.py`` are **not** in the manifest and are
+   never overwritten.
+5. The device reboots automatically after a successful update.
+
+Creating a New Release
+----------------------
+
+1. Update the ``"version"`` field in ``main.json`` (e.g. ``"1.4"``).
+2. Ensure the ``"files"`` array in ``main.json`` lists every file that
+   should be managed by OTA.
+3. Commit and push to your ``main`` branch.
+4. On GitHub, go to **Releases → Draft a new release**.
+5. Set the **Tag** to match the version string exactly (e.g. ``1.4``).
+6. Set **Target** to ``main``.
+7. Publish the release.
+
+The device can now pick up the update via the "Check for Updates" button
+on the web dashboard.
+
+
+Hardware Notes (ESP32-S3 DevKitC)
+==================================
+
+The project targets the official Espressif ESP32-S3-DevKitC-1. Both
+``SPI(1)`` and ``SPI(2)`` work, but you must choose pins carefully —
+especially on the **N8R8 variant** (8 MB Octal-SPIRAM). The default pin
+assignments in ``config_defaults.py`` are known to work on this board.
+
+GPIO Pins to Avoid
+-------------------
+
+Based on real-world testing with MicroPython on the ESP32-S3-DevKitC-1:
+
+====================  =============================================================
+Pins                  Reason
+====================  =============================================================
+**GPIO 0**            Directly affects the bootloader (BOOT/STRAPPING pin)
+**GPIO 19, 20**       USB-JTAG (usable if USB-OTG is not needed; GPIO 20 is used
+                      as MAX6675 MISO in this project)
+**GPIO 43, 44**       UART0 TX/RX — used by the serial console / REPL
+**GPIO 48**           Directly drives the on-board RGB LED
+**GPIO 33–37**        **N8R8 only** — reserved by the Octal-SPIRAM (PSRAM)
+                      interface; free to use on the N8 variant (no PSRAM)
+**GPIO 9–11**         Default HSPI pins — MicroPython maps these to ``SPI(1)``
+                      internally; reassigning them to other functions may conflict
+====================  =============================================================
+
+The remaining GPIOs (1–8, 12–18, 21, 38–42, 45–47) are generally safe
+for user peripherals. Always double-check against the official
+`ESP32-S3-DevKitC-1 schematic <https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/index.html>`_.
+
+SPI Bus Assignment
+------------------
+
+This project uses both hardware SPI buses:
+
+* ``SPI(1)`` — MAX6675 K-type thermocouple (read-only, no MOSI needed).
+* ``SPI(2)`` — BME/BMP280 pressure and temperature sensor.
+
+On the N8R8 board, ``SPI(1)`` works as long as you avoid the Octal-SPIRAM
+pins (GPIO 33–37) for its SCK/MISO. The default configuration routes
+MAX6675 SCK to GPIO 47, which is free on all variants.
 
 
 License

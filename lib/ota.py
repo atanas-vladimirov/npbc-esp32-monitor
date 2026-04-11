@@ -89,32 +89,41 @@ class OTAUpdater:
         """Download and install all files for the given version."""
         for file in files:
             url = self._raw_url(version, file)
-            print(f'Downloading {file}')
 
-            try:
-                response = requests.get(url, headers=self._HEADERS, timeout=self._TIMEOUT)
-                if response.status_code != 200:
-                    print(f"Failed to download {file}: HTTP {response.status_code}")
-                    return False
-
-                path_parts = file.split('/')
-                if len(path_parts) > 1:
-                    dir_path = self._main_dir
-                    for part in path_parts[:-1]:
-                        dir_path += '/' + part
-                        try: uos.mkdir(dir_path)
-                        except OSError as e:
-                            if e.args[0] != 17: raise
-
-                with open(self._main_dir + '/' + file, 'w') as f:
-                    f.write(response.text)
-
-                response.close()
+            for attempt in range(self._MAX_RETRIES):
                 gc.collect()
+                print(f'Downloading {file}' + (f' (retry {attempt})' if attempt else ''))
+                try:
+                    response = requests.get(url, headers=self._HEADERS, timeout=self._TIMEOUT)
+                    if response.status_code != 200:
+                        print(f"Failed to download {file}: HTTP {response.status_code}")
+                        return False
 
-            except Exception as e:
-                print(f"Failed to download {file}: {e}")
-                return False
+                    path_parts = file.split('/')
+                    if len(path_parts) > 1:
+                        dir_path = self._main_dir
+                        for part in path_parts[:-1]:
+                            dir_path += '/' + part
+                            try: uos.mkdir(dir_path)
+                            except OSError as e:
+                                if e.args[0] != 17: raise
+
+                    with open(self._main_dir + '/' + file, 'w') as f:
+                        f.write(response.text)
+
+                    response.close()
+                    break  # success, move to next file
+
+                except Exception as e:
+                    if 'response' in locals():
+                        try: response.close()
+                        except: pass
+                    if attempt < self._MAX_RETRIES - 1:
+                        print(f"Error downloading {file}: {e}")
+                        time.sleep(2)
+                    else:
+                        print(f"Failed to download {file} after {self._MAX_RETRIES} attempts: {e}")
+                        return False
 
         try:
             with open(self._main_dir + '/main.json', 'w') as f:

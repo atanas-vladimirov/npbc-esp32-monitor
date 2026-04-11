@@ -3,7 +3,7 @@ import gc
 import json
 import uasyncio as asyncio
 import urequests as requests
-from machine import Pin, SPI, SoftSPI, reset
+from machine import Pin, SPI, reset
 import network
 import time
 import ntptime
