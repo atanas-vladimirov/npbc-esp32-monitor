@@ -121,18 +121,24 @@ class NPBCController:
         self.uart = UART(2, baudrate=baudrate, tx=tx_pin, rx=rx_pin, timeout=1000, rxbuf=256)
         self.lock = asyncio.Lock()
 
-    async def _send_command(self, cmd_instance):
+    async def _send_command(self, cmd_instance, timeout_ms=300):
         async with self.lock:
             try:
+                self.uart.read()
                 request = cmd_instance.get_request()
                 self.uart.write(request)
-                await asyncio.sleep_ms(500)
-                if self.uart.any():
-                    response_data = self.uart.read()
-                    return cmd_instance.process_response(response_data)
-                else:
-                    print(f"No response for command {cmd_instance._command_id}")
-                    return None
+
+                elapsed = 0
+                poll_interval = 25
+                while elapsed < timeout_ms:
+                    if self.uart.any():
+                        await asyncio.sleep_ms(50)
+                        response_data = self.uart.read()
+                        return cmd_instance.process_response(response_data)
+                    await asyncio.sleep_ms(poll_interval)
+                    elapsed += poll_interval
+
+                return None
             except Exception as e:
                 print("--- CAUGHT AN EXCEPTION ---")
                 sys.print_exception(e)

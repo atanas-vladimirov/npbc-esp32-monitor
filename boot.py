@@ -3,31 +3,31 @@ import gc
 import network
 import ntptime
 import machine
-import webrepl
 import time
 import config
 
-# Try to import secrets, if it fails, the device is not configured
 try:
     import secrets
 except ImportError:
     print("ERROR: 'secrets.py' file not found. Please create it with your credentials.")
     secrets = None
 
-# Set high CPU frequency
 machine.freq(240000000)
 
-# Start WebREPL for debugging, using the password from secrets.py
-if secrets and hasattr(secrets, 'WEBREPL_PASS'):
-    webrepl.start(password=secrets.WEBREPL_PASS)
-    print("WebREPL started with password from secrets.py.")
+if getattr(config, 'ENABLE_WEBREPL', True):
+    import webrepl
+    if secrets and hasattr(secrets, 'WEBREPL_PASS'):
+        webrepl.start(password=secrets.WEBREPL_PASS)
+        print("WebREPL started with password from secrets.py.")
+    else:
+        webrepl.start()
+        print("WebREPL started with default or no password.")
 else:
-    webrepl.start()
-    print("WebREPL started with default or no password.")
+    print("WebREPL disabled.")
 
 
 def connect_wifi():
-    """Connects to WiFi and sets the system time."""
+    """Connects to WiFi and sets the system time via NTP."""
     if not (secrets and hasattr(secrets, 'WIFI_SSID')):
         print("Cannot connect to WiFi, secrets not available or incomplete.")
         return
@@ -36,7 +36,7 @@ def connect_wifi():
     if not sta_if.isconnected():
         print('Connecting to network...')
         sta_if.active(True)
-        sta_if.config(pm=sta_if.PM_NONE) # disable power management
+        sta_if.config(pm=sta_if.PM_NONE)
 
         if config.STATIC_IP:
             sta_if.ifconfig(config.STATIC_IP)
@@ -62,14 +62,6 @@ def connect_wifi():
     else:
         print('\nFailed to connect to WiFi.')
 
-# Run connection logic
 connect_wifi()
-
-# Start the FTP Server
-try:
-    import uftpd
-    print("FTP Server started.")
-except ImportError:
-    print("Could not start FTP Server. 'uftpd.py' not found.")
 
 gc.collect()

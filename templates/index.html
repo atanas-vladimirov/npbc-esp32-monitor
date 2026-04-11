@@ -87,10 +87,7 @@
         <header>
             <h1>ESP32 Pellet Burner Monitor</h1>
             <div class="header-right">
-                <div class="header-stats">
-                    <span id="uptime-display">Uptime: ...</span>
-                    <span id="last-update">Last update: ...</span>
-                </div>
+                <span id="last-update">Last update: ...</span>
                 <button id="theme-toggle">🌙</button>
             </div>
         </header>
@@ -133,6 +130,21 @@
                     </div>
 
                     <div class="card">
+                        <h2>ESP32 Device</h2>
+                        <p><strong>IP Address:</strong> <span id="esp-ip">...</span></p>
+                        <p><strong>WiFi RSSI:</strong> <span id="esp-rssi">...</span> dBm</p>
+                        <p><strong>Free Memory:</strong> <span id="esp-mem">...</span> bytes</p>
+                        <p><strong>Uptime:</strong> <span id="esp-uptime">...</span></p>
+                        <p><strong>Firmware:</strong> <span id="esp-version">...</span></p>
+                        <div class="update-section">
+                            <hr>
+                            <button id="update-button">Check for Updates</button>
+                            <button id="reboot-button" class="btn-danger">Reboot ESP32</button>
+                            <p id="update-status"></p>
+                        </div>
+                    </div>
+
+                    <div class="card">
                         <h2>Controls</h2>
                         <form id="settings-form">
                             <div class="form-group">
@@ -155,12 +167,6 @@
                             <button type="submit">Set Mode & Priority</button>
                         </form>
                         <p id="form-status"></p>
-                        <div class="update-section">
-                            <hr>
-                            <button id="update-button">Check for Updates</button>
-                            <button id="reboot-button" class="btn-danger">Reboot ESP32</button>
-                            <p id="update-status"></p>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -252,8 +258,15 @@
             }
             const burner = data.burner || {};
             const sensors = data.sensors || {};
+            const esp = data.esp32 || {};
             document.getElementById('last-update').textContent = `Last update: ${data.last_update || '...'}`;
-            document.getElementById('uptime-display').textContent = `Uptime: ${data.uptime || '...'}`;
+
+            // --- ESP32 Device Card ---
+            document.getElementById('esp-ip').textContent = esp.ip || 'N/A';
+            document.getElementById('esp-rssi').textContent = esp.rssi !== null && esp.rssi !== undefined ? esp.rssi : 'N/A';
+            document.getElementById('esp-mem').textContent = esp.free_mem !== undefined ? esp.free_mem.toLocaleString() : 'N/A';
+            document.getElementById('esp-uptime').textContent = esp.uptime || '...';
+            document.getElementById('esp-version').textContent = esp.version || 'N/A';
 
             // --- Burner Status Card ---
             document.getElementById('burner-mode').textContent = burner.Mode || 'N/A';

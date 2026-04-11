@@ -1,8 +1,8 @@
 # secrets.py
 
 # WiFi Credentials
-WIFI_SSID = 'your_wifi_ssid'
-WIFI_PASS = 'your_wifi_password'
+WIFI_SSID = 'whitebox'
+WIFI_PASS = 'pixel@home'
 
 # WebREPL password
-WEBREPL_PASS = 'your_webrepl_password'
+WEBREPL_PASS = '1'
