@@ -13,7 +13,8 @@ class OTAUpdater:
     with robust error handling, timeouts, and content validation.
     """
     _TIMEOUT = 10
-    _MAX_RETRIES = 3 # Number of times to retry on a network busy error
+    _MAX_RETRIES = 3
+    _HEADERS = {'User-Agent': 'micropython-ota'}
 
     def __init__(self, github_repo, module='', main_dir='main'):
         self._TIMEOUT = 10
@@ -36,7 +37,7 @@ class OTAUpdater:
 
         for attempt in range(self._MAX_RETRIES):
             try:
-                response = requests.get(url, timeout=self._TIMEOUT)
+                response = requests.get(url, headers=self._HEADERS, timeout=self._TIMEOUT)
                 if response.status_code != 200:
                     print(f"Error: Received status {response.status_code} from {url}")
                     return None, f"HTTP Error {response.status_code}"
@@ -82,7 +83,7 @@ class OTAUpdater:
             print(f'Downloading {file}')
 
             try:
-                response = requests.get(url, timeout=self._TIMEOUT)
+                response = requests.get(url, headers=self._HEADERS, timeout=self._TIMEOUT)
                 if response.status_code != 200:
                     print(f"Failed to download {file}: HTTP {response.status_code}")
                     return False
