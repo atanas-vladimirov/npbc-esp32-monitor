@@ -13,7 +13,7 @@ import math
 from microdot import Microdot, Response, send_file
 
 # App-specific imports
-import config
+from lib.config_loader import config
 from lib.npbc import NPBCController
 from lib.ota import OTAUpdater
 from lib.scheduler import Scheduler
@@ -56,8 +56,8 @@ class SensorReader:
     def __init__(self):
 
         spi1 = SPI(1, baudrate=100000,
-                  sck=Pin(config.PIN_SPI_SCK),
-                  miso=Pin(config.PIN_SPI_MISO))
+                  sck=Pin(config.PIN_MAX6675_SCK),
+                  miso=Pin(config.PIN_MAX6675_MISO))
 
         spi2 = SPI(2, baudrate=100000,
                   sck=Pin(config.PIN_BME_SCK),

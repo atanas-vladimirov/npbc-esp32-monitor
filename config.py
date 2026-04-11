@@ -1,45 +1,24 @@
-# config.py
+# config.py — User overrides (NOT overwritten by OTA updates).
+# Only add settings here that differ from config_defaults.py.
+# Any value defined here takes priority over the default.
 
 # NTP Server
 NTP_HOST = 'bg.pool.ntp.org'
 
-# Interval in seconds to re-sync the time.
-# 3600 seconds = 1 hour
-NTP_SYNC_INTERVAL = 3600
-
-# --- Timezone Configuration ---
-# A POSIX string for your timezone. This automatically handles DST.
-# EET-2EEST = Eastern European Time (UTC+2), Daylight Saving is EEST (UTC+3)
+# Timezone: Eastern European Time (UTC+2), DST = EEST (UTC+3)
 TIMEZONE_POSIX = "EET-2EEST,M3.5.0/3,M10.5.0/4"
 
-# Remote Data-logging Server (set to None to disable remote posting)
-REMOTE_POST_URL = None  # 'http://172.16.1.111:8088/api/logData'
-
-# ESP32 Static IP (Optional, leave as None for DHCP)
-# To use, uncomment the line below and fill in your network details.
-# STATIC_IP = ('192.168.1.100', '255.255.255.0', '192.168.1.1', '8.8.8.8')
-STATIC_IP = None
-
-# --- Optional network services ---
-ENABLE_WEBREPL = True
-ENABLE_FTP = True
-
-# --- OTA Update Configuration ---
-# URL to your public GitHub repository
-GITHUB_REPO = 'https://github.com/atanas-vladimirov/npbc-esp32-monitor'
-
 # --- Pin Assignments ---
-# Main Hardware SPI Bus
-PIN_SPI_SCK = 47
-PIN_SPI_MISO = 20
-
-PIN_BME_SCK = 8     # SCL on BME/P 280 - green
-PIN_BME_MISO = 17   # SDO on BME/P 280 - brown/white
-PIN_BME_MOSI = 18   # SDA on BME/P 280 - brown
-
-# Unique Chip Select (CS) pin for each SPI device
-PIN_BME_CS = 16     # CSB on BME/P 280 blue/white
+# MAX6675 K-Type thermocouple (SPI bus 1)
+PIN_MAX6675_SCK = 47
+PIN_MAX6675_MISO = 20
 PIN_MAX6675_CS = 21
+
+# BME/BMP280 pressure/temp sensor (SPI bus 2)
+PIN_BME_SCK = 8     # SCL - green
+PIN_BME_MISO = 17   # SDO - brown/white
+PIN_BME_MOSI = 18   # SDA - brown
+PIN_BME_CS = 16     # CSB - blue/white
 
 # Other Pins
 PIN_DS18X20 = 3

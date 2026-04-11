@@ -4,7 +4,7 @@ import network
 import ntptime
 import machine
 import time
-import config
+from lib.config_loader import config
 
 try:
     import secrets
